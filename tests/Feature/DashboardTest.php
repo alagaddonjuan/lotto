@@ -54,8 +54,8 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Q4I Financial Engine');
         $response->assertSee('Registered Players');
-        $response->assertSee('Live WhatsApp Bets');
-        $response->assertSee('Operator Reps and Access');
+        $response->assertSee('Live Transactions Ledger');
+        $response->assertSee('Operator Reps');
     }
 
     public function test_dashboard_stats_api_returns_accurate_splits(): void

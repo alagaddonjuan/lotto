@@ -16,29 +16,19 @@
                 <i class="fa-solid fa-key text-2xl"></i>
             </div>
             <h1 class="text-2xl font-black text-white tracking-tight">Reset Password</h1>
-            <p class="text-xs text-slate-400 mt-1">Recover your operator portal access</p>
+            <p class="text-xs text-slate-400 mt-1">Operator Account Access Recovery</p>
         </div>
 
         <!-- Forgot Password Card -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur-xl">
             <p class="text-xs text-slate-300 mb-6 leading-relaxed">
-                Enter your registered corporate email below. We'll generate a secure token to reset your password.
+                Enter your registered corporate email below. If an active operator account is found, a secure password reset link will be dispatched to your inbox.
             </p>
 
             @if (session('status'))
-                <div class="mb-5 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs space-y-2">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-circle-check"></i>
-                        <span>{{ session('status') }}</span>
-                    </div>
-                    @if (session('reset_url'))
-                        <div class="pt-2 border-t border-emerald-500/20">
-                            <a href="{{ session('reset_url') }}" class="inline-flex items-center gap-1.5 font-bold text-white bg-emerald-500 hover:bg-emerald-400 px-3 py-1.5 rounded-lg text-xs transition">
-                                <span>Open Reset Password Link</span>
-                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                            </a>
-                        </div>
-                    @endif
+                <div class="mb-5 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>{{ session('status') }}</span>
                 </div>
             @endif
 
@@ -53,7 +43,7 @@
                 @csrf
 
                 <div>
-                    <label for="email" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Corporate Email</label>
+                    <label for="email" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Corporate Work Email</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500 text-sm">
                             <i class="fa-solid fa-envelope"></i>
@@ -71,12 +61,18 @@
                 </button>
             </form>
 
-            <div class="mt-6 text-center text-xs text-slate-400">
+            <div class="mt-8 pt-6 border-t border-slate-800 text-center text-xs text-slate-400">
                 Remembered your password?
                 <a href="{{ route('login') }}" class="text-emerald-400 hover:text-emerald-300 font-bold ml-1 transition">
-                    Back to Login &rarr;
+                    Back to Sign In &rarr;
                 </a>
             </div>
+        </div>
+
+        <div class="text-center mt-6 text-slate-600 text-xs flex justify-center items-center gap-4">
+            <span>&copy; {{ date('Y') }} Q4I Limited</span>
+            <span>&bull;</span>
+            <span>Identity Security Node</span>
         </div>
     </div>
 

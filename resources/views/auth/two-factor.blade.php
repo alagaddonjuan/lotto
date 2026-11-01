@@ -10,20 +10,25 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
 
     <div class="w-full max-w-md">
-        <!-- Logo & Title -->
+        <!-- Logo & Header -->
         <div class="text-center mb-8">
             <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 items-center justify-center font-black text-2xl text-slate-950 shadow-xl shadow-emerald-500/20 mb-4">
                 <i class="fa-solid fa-shield-halved text-2xl"></i>
             </div>
             <h1 class="text-2xl font-black text-white tracking-tight">Two-Factor Authentication</h1>
-            <p class="text-xs text-slate-400 mt-1">High-Security Verification Code Required</p>
+            <p class="text-xs text-slate-400 mt-1">Enterprise Operator Identity Verification</p>
         </div>
 
         <!-- 2FA Card -->
         <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur-xl">
-            <p class="text-xs text-slate-300 text-center mb-6 leading-relaxed">
-                Enter the 6-digit security code issued for your account (<span class="font-mono text-emerald-400">{{ $email }}</span>) to proceed.
-            </p>
+            <div class="text-center mb-6">
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    A secure 6-digit authentication code has been dispatched to:
+                </p>
+                <p class="text-xs font-mono font-bold text-emerald-400 mt-1 bg-slate-950/80 py-1 px-3 rounded-lg inline-block border border-slate-800">
+                    {{ $email }}
+                </p>
+            </div>
 
             @if (session('status'))
                 <div class="mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs text-center flex items-center justify-center gap-2">
@@ -43,29 +48,20 @@
                 @csrf
 
                 <div>
-                    <label for="code" class="block text-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">6-Digit Security PIN</label>
-                    <input type="text" id="code" name="code" required maxlength="6" autofocus
+                    <label for="code" class="block text-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                        Enter 6-Digit Authentication Code
+                    </label>
+                    <input type="text" id="code" name="code" required maxlength="6" autofocus pattern="[0-9]{6}" inputmode="numeric"
                         placeholder="••••••"
-                        class="w-full text-center tracking-[0.5em] text-2xl font-mono font-bold bg-slate-950 border border-slate-700 rounded-2xl py-3.5 text-emerald-400 placeholder-slate-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 transition">
+                        class="w-full text-center tracking-[0.5em] text-3xl font-mono font-bold bg-slate-950 border border-slate-700 rounded-2xl py-4 text-emerald-400 placeholder-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 transition">
                 </div>
 
                 <button type="submit"
                     class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-sm text-slate-950 shadow-lg shadow-emerald-500/20 transition duration-150 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-lock-open"></i>
-                    <span>Verify & Access Dashboard</span>
+                    <span>Verify & Continue to Clearinghouse</span>
                 </button>
             </form>
-
-            @if(isset($demoOtp) && $demoOtp)
-                <!-- Developer / Demo Helper for Testing -->
-                <div class="mt-6 p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                    <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 font-semibold">Active Security Code</p>
-                    <button type="button" onclick="autofillCode('{{ $demoOtp }}')" class="font-mono text-sm font-bold text-emerald-400 hover:text-emerald-300 transition flex items-center justify-center gap-2 mx-auto">
-                        <span>{{ $demoOtp }}</span>
-                        <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-sans">Click to Autofill</span>
-                    </button>
-                </div>
-            @endif
 
             <div class="mt-6 pt-6 border-t border-slate-800 flex justify-between items-center text-xs">
                 <form method="POST" action="{{ route('two-factor.resend') }}">
@@ -81,14 +77,13 @@
                 </a>
             </div>
         </div>
+
+        <div class="text-center mt-6 text-slate-600 text-xs flex justify-center items-center gap-4">
+            <span>&copy; {{ date('Y') }} Q4I Limited</span>
+            <span>&bull;</span>
+            <span>PCI-DSS & NLRC Compliant</span>
+        </div>
     </div>
 
-    <script>
-        function autofillCode(code) {
-            const input = document.getElementById('code');
-            input.value = code;
-            input.focus();
-        }
-    </script>
 </body>
 </html>

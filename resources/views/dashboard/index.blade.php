@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Q4I Platform | {{ $tenant->name }} Dashboard</title>
+    <title>Q4I Financial Engine | {{ $tenant->name }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,62 +11,60 @@
         .tab-btn.active {
             color: #10b981;
             border-bottom: 2px solid #10b981;
-            background: rgba(16, 185, 129, 0.06);
+            background: rgba(16, 185, 129, 0.05);
         }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
 
     <!-- Top Navigation Header -->
-    <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-40 px-6 py-3.5 flex flex-wrap justify-between items-center gap-4">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center font-black text-xl text-slate-950 shadow-lg shadow-emerald-500/20">
+    <header class="border-b border-slate-800 bg-slate-950/95 backdrop-blur sticky top-0 z-40 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+        <!-- Brand / Identity -->
+        <div class="flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center font-black text-2xl text-slate-950 shadow-xl shadow-emerald-500/20">
                 Q
             </div>
             <div>
-                <h1 class="font-bold text-base leading-tight flex items-center gap-2">
-                    <span>Q4I Financial Engine</span>
-                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono">35/65 Split Ledger</span>
-                </h1>
-                <p class="text-xs text-slate-400">
-                    Tenant: <strong class="text-slate-200">{{ $tenant->name }}</strong> ({{ $tenant->currency }})
+                <div class="flex items-center gap-2.5">
+                    <h1 class="font-bold text-base text-white tracking-tight leading-none">Q4I Financial Engine</h1>
+                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1.5 font-semibold">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        NLRC Node: Operational
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">
+                    Operator: <strong class="text-slate-200">{{ $tenant->name }}</strong> &bull; <span class="font-mono text-emerald-400">35/65 Split Clearinghouse</span>
                 </p>
             </div>
         </div>
 
-        <!-- Header Actions & Controls -->
+        <!-- Header Actions -->
         <div class="flex flex-wrap items-center gap-3">
-            <!-- Fast Action: Simulate Real Bet -->
-            <button onclick="openModal('modalSimulateBet')" class="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-bolt"></i>
-                <span>Simulate Bet</span>
-            </button>
+            <!-- Period Indicator -->
+            <div class="hidden lg:flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300">
+                <i class="fa-regular fa-calendar text-slate-400"></i>
+                <span>{{ now()->format('F Y') }} Cycle</span>
+            </div>
 
-            <!-- Fast Action: Simulate DVA Deposit -->
-            <button onclick="openModal('modalSimulateDeposit')" class="px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-building-columns"></i>
-                <span>DVA Deposit</span>
-            </button>
-
-            <!-- Link to Player Web Kiosk -->
-            <a href="{{ route('play.portal') }}" target="_blank" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5">
-                <i class="fa-brands fa-whatsapp text-emerald-400"></i>
-                <span class="hidden sm:inline">Player Kiosk</span>
+            <!-- Settlement Invoice PDF -->
+            <a href="{{ route('dashboard.invoice', ['tenant_id' => $tenant->id]) }}" target="_blank"
+                class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-200 transition flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-file-invoice-dollar text-emerald-400"></i>
+                <span class="hidden sm:inline">Settlement Invoice</span>
             </a>
 
-            <!-- Super Admin New Operator Button -->
-            @if(auth()->check() && auth()->user()->isSuperAdmin())
-                <button onclick="openModal('modalNewTenant')" class="px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-xs font-bold transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-plus"></i>
-                    <span class="hidden md:inline">Add Operator</span>
-                </button>
-            @endif
+            <!-- Export CSV -->
+            <a href="{{ route('dashboard.export-csv', ['tenant_id' => $tenant->id]) }}"
+                class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-200 transition flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-file-csv text-cyan-400"></i>
+                <span class="hidden sm:inline">Export CSV</span>
+            </a>
 
             <!-- Multi-Tenant Dropdown for Super Admins -->
             @if(auth()->check() && auth()->user()->isSuperAdmin() && $allTenants->count() > 1)
-                <form method="GET" action="{{ route('dashboard') }}" class="flex items-center gap-2">
+                <form method="GET" action="{{ route('dashboard') }}" class="flex items-center">
                     <input type="hidden" name="tab" value="{{ $currentTab }}">
-                    <select name="tenant_id" onchange="this.form.submit()" class="bg-slate-900 border border-slate-700 text-xs rounded-xl px-2.5 py-1.5 text-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    <select name="tenant_id" onchange="this.form.submit()" class="bg-slate-900 border border-slate-700 text-xs rounded-xl px-3 py-2 text-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none">
                         @foreach($allTenants as $t)
                             <option value="{{ $t->id }}" {{ $t->id == $tenant->id ? 'selected' : '' }}>
                                 {{ $t->name }} ({{ $t->country_code }})
@@ -80,18 +78,18 @@
             @if(auth()->check())
                 <div class="flex items-center gap-3 pl-3 border-l border-slate-800">
                     <div class="text-right hidden md:block">
-                        <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5 justify-end">
+                        <div class="text-xs font-bold text-slate-200 flex items-center gap-2 justify-end">
                             <span>{{ auth()->user()->name }}</span>
-                            <button onclick="toggle2FA()" title="Toggle Two-Factor Authentication" class="text-[10px] px-1.5 py-0.5 rounded cursor-pointer transition {{ auth()->user()->two_factor_enabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500' }}">
-                                <i class="fa-solid fa-shield-halved"></i> 2FA {{ auth()->user()->two_factor_enabled ? 'ON' : 'OFF' }}
-                            </button>
+                            <span class="text-[10px] px-2 py-0.5 rounded font-mono font-bold {{ auth()->user()->two_factor_enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400' }}">
+                                <i class="fa-solid fa-shield-halved text-[9px]"></i> 2FA {{ auth()->user()->two_factor_enabled ? 'ON' : 'OFF' }}
+                            </span>
                         </div>
                         <div class="text-[10px] text-emerald-400 font-mono capitalize">{{ str_replace('_', ' ', auth()->user()->role) }}</div>
                     </div>
 
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" title="Logout" class="p-2 rounded-xl bg-slate-900 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 text-xs transition">
+                        <button type="submit" title="Sign Out" class="p-2.5 rounded-xl bg-slate-900 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 text-xs transition">
                             <i class="fa-solid fa-arrow-right-from-bracket"></i>
                         </button>
                     </form>
@@ -100,59 +98,57 @@
         </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <div class="border-b border-slate-800 bg-slate-900/40 px-6">
+    <!-- Navigation Tabs Bar -->
+    <div class="border-b border-slate-800 bg-slate-900/50 px-6">
         <div class="max-w-7xl mx-auto flex gap-2 overflow-x-auto text-xs font-semibold">
             <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn active px-4 py-3 border-b-2 border-transparent transition flex items-center gap-2">
-                <i class="fa-solid fa-chart-line"></i>
-                <span>Revenue & 35/65 Split</span>
-            </button>
-            <button onclick="switchTab('players')" id="tab-btn-players" class="tab-btn px-4 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
-                <i class="fa-solid fa-users"></i>
-                <span>Registered Players</span>
-                <span class="bg-emerald-500/20 text-emerald-400 text-[10px] px-1.5 py-0.5 rounded-full">{{ $totalPlayers }}</span>
+                <i class="fa-solid fa-chart-line text-emerald-400"></i>
+                <span>Financial Overview & 35/65 Split</span>
             </button>
             <button onclick="switchTab('tickets')" id="tab-btn-tickets" class="tab-btn px-4 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
-                <i class="fa-brands fa-whatsapp text-emerald-400"></i>
-                <span>Live WhatsApp Bets</span>
-                <span class="bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full">{{ $balanceSheet['financials']['total_tickets'] }}</span>
+                <i class="fa-solid fa-receipt text-cyan-400"></i>
+                <span>Live Transactions Ledger</span>
+                <span class="bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded-full font-mono">{{ $balanceSheet['financials']['total_tickets'] }}</span>
+            </button>
+            <button onclick="switchTab('players')" id="tab-btn-players" class="tab-btn px-4 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
+                <i class="fa-solid fa-users text-blue-400"></i>
+                <span>Registered Players</span>
+                <span class="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-mono">{{ $totalPlayers }}</span>
             </button>
             <button onclick="switchTab('games')" id="tab-btn-games" class="tab-btn px-4 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
                 <i class="fa-solid fa-dice text-amber-400"></i>
-                <span>Lotto Games Catalog</span>
+                <span>Games & Limits</span>
             </button>
             <button onclick="switchTab('reps')" id="tab-btn-reps" class="tab-btn px-4 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
                 <i class="fa-solid fa-user-shield text-purple-400"></i>
-                <span>Operator Reps and Access</span>
+                <span>Operator Reps & Access</span>
             </button>
         </div>
     </div>
 
-    <!-- Flash Messages -->
-    @if(session('success'))
-        <div class="max-w-7xl mx-auto px-6 pt-4">
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-6 py-8 space-y-8 flex-1 w-full">
+
+        @if(session('success'))
             <div class="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
                 <i class="fa-solid fa-circle-check"></i>
                 <span>{{ session('success') }}</span>
             </div>
-        </div>
-    @endif
-
-    <main class="max-w-7xl mx-auto px-6 py-8 space-y-8 flex-1 w-full">
+        @endif
 
         <!-- ========================================== -->
         <!-- TAB 1: FINANCIAL OVERVIEW & 35/65 SPLIT   -->
         <!-- ========================================== -->
         <div id="tab-content-overview" class="tab-pane space-y-8">
 
-            <!-- Revenue Metric Cards -->
+            <!-- KPI Metric Cards -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <!-- Turnover -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-sm">
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Turnover (Stakes)</p>
-                            <h3 class="text-2xl font-black mt-2 text-white" id="statTurnover">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Gross Turnover (Stakes)</p>
+                            <h3 class="text-2xl font-black mt-2 text-white font-mono" id="statTurnover">
                                 {{ $tenant->currency }} {{ number_format($balanceSheet['financials']['total_turnover'], 2) }}
                             </h3>
                         </div>
@@ -161,8 +157,8 @@
                         </div>
                     </div>
                     <p class="text-xs text-slate-400 mt-4 flex items-center justify-between">
-                        <span><strong class="text-emerald-400 font-mono" id="statTicketsCount">{{ $balanceSheet['financials']['total_tickets'] }}</strong> tickets processed</span>
-                        <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400">Real-time</span>
+                        <span><strong class="text-emerald-400 font-mono" id="statTicketsCount">{{ $balanceSheet['financials']['total_tickets'] }}</strong> tickets settled</span>
+                        <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono">100% Cleared</span>
                     </p>
                 </div>
 
@@ -171,7 +167,7 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Q4I Commission (35%)</p>
-                            <h3 class="text-2xl font-black mt-2 text-emerald-300" id="statQ4iCommission">
+                            <h3 class="text-2xl font-black mt-2 text-emerald-300 font-mono" id="statQ4iCommission">
                                 {{ $tenant->currency }} {{ number_format($balanceSheet['splits']['q4i_accrued_earned'], 2) }}
                             </h3>
                         </div>
@@ -182,12 +178,12 @@
                     <p class="text-xs text-emerald-400/80 mt-4 font-mono">Accrued Platform Commission</p>
                 </div>
 
-                <!-- Modern Lottery 65% Share -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-sm">
+                <!-- Operator Share 65% -->
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-sm">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Operator Share (65%)</p>
-                            <h3 class="text-2xl font-black mt-2 text-purple-300" id="statOperatorShare">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Operator Share (65%)</p>
+                            <h3 class="text-2xl font-black mt-2 text-purple-300 font-mono" id="statOperatorShare">
                                 {{ $tenant->currency }} {{ number_format($balanceSheet['splits']['operator_accrued_pool'], 2) }}
                             </h3>
                         </div>
@@ -203,7 +199,7 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wider text-cyan-400">Available to Settle / Spend</p>
-                            <h3 class="text-2xl font-black mt-2 text-cyan-300" id="statAvailableSpend">
+                            <h3 class="text-2xl font-black mt-2 text-cyan-300 font-mono" id="statAvailableSpend">
                                 {{ $tenant->currency }} {{ number_format($balanceSheet['splits']['q4i_available_to_spend'], 2) }}
                             </h3>
                         </div>
@@ -211,14 +207,14 @@
                             <i class="fa-solid fa-wallet"></i>
                         </div>
                     </div>
-                    <p class="text-xs text-cyan-400/80 mt-4 font-mono">Net Withdrawable Commission</p>
+                    <p class="text-xs text-cyan-400/80 mt-4 font-mono">Net Withdrawable</p>
                 </div>
             </div>
 
             <!-- Commercial Terms & Cryptographic Ledger -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Revenue Distribution & Chart -->
-                <div class="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                <!-- Commercial Split Visualizer -->
+                <div class="lg:col-span-2 bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="font-bold text-sm flex items-center gap-2">
                             <i class="fa-solid fa-chart-pie text-emerald-400"></i>
@@ -227,53 +223,53 @@
                         <span class="text-xs text-slate-500 font-mono">Audited by SHA-256 Ledger</span>
                     </div>
 
-                    <div class="space-y-5">
+                    <div class="space-y-6">
                         <div>
-                            <div class="flex justify-between text-xs font-semibold mb-1.5">
-                                <span class="text-emerald-400">Q4I Limited Share (35%)</span>
-                                <span class="text-emerald-300" id="distQ4iText">{{ $tenant->currency }} {{ number_format($balanceSheet['splits']['q4i_accrued_earned'], 2) }}</span>
+                            <div class="flex justify-between text-xs font-semibold mb-2">
+                                <span class="text-emerald-400">Q4I Limited Share (35.00%)</span>
+                                <span class="text-emerald-300 font-mono" id="distQ4iText">{{ $tenant->currency }} {{ number_format($balanceSheet['splits']['q4i_accrued_earned'], 2) }}</span>
                             </div>
-                            <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-emerald-500 rounded-full" style="width: 35%"></div>
+                            <div class="w-full h-3.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style="width: 35%"></div>
                             </div>
                         </div>
 
                         <div>
-                            <div class="flex justify-between text-xs font-semibold mb-1.5">
-                                <span class="text-purple-400">{{ $tenant->name }} Share (65%)</span>
-                                <span class="text-purple-300" id="distOpText">{{ $tenant->currency }} {{ number_format($balanceSheet['splits']['operator_accrued_pool'], 2) }}</span>
+                            <div class="flex justify-between text-xs font-semibold mb-2">
+                                <span class="text-purple-400">{{ $tenant->name }} Share (65.00%)</span>
+                                <span class="text-purple-300 font-mono" id="distOpText">{{ $tenant->currency }} {{ number_format($balanceSheet['splits']['operator_accrued_pool'], 2) }}</span>
                             </div>
-                            <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-purple-500 rounded-full" style="width: 65%"></div>
+                            <div class="w-full h-3.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full" style="width: 65%"></div>
                             </div>
                         </div>
                     </div>
 
                     <div class="mt-8 pt-6 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-                        <div class="bg-slate-950/40 p-3.5 rounded-xl border border-slate-800/80">
-                            <p class="text-xs text-slate-400">Platform Split</p>
-                            <p class="font-bold text-sm text-slate-200 mt-1">35% Fixed</p>
+                        <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
+                            <p class="text-xs text-slate-400 uppercase font-semibold">Platform Fee</p>
+                            <p class="font-bold text-base text-slate-100 mt-1">35% Fixed</p>
                         </div>
-                        <div class="bg-slate-950/40 p-3.5 rounded-xl border border-slate-800/80">
-                            <p class="text-xs text-slate-400">Meta Messaging Charge</p>
-                            <p class="font-bold text-sm text-amber-300 mt-1">Borne by Operator</p>
+                        <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
+                            <p class="text-xs text-slate-400 uppercase font-semibold">Meta WhatsApp Fee</p>
+                            <p class="font-bold text-base text-amber-300 mt-1">Borne by Operator</p>
                         </div>
-                        <div class="bg-slate-950/40 p-3.5 rounded-xl border border-slate-800/80">
-                            <p class="text-xs text-slate-400">Settlement Cycle</p>
-                            <p class="font-bold text-sm text-cyan-300 mt-1">Monthly Auto-Reconciled</p>
+                        <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
+                            <p class="text-xs text-slate-400 uppercase font-semibold">Settlement Cadence</p>
+                            <p class="font-bold text-base text-cyan-300 mt-1">Monthly Auto-Reconciled</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Hash Chain Card & Settlement Exports -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                <!-- Hash Chain Card -->
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
                     <div>
                         <h3 class="font-bold text-sm flex items-center gap-2 mb-3">
                             <i class="fa-solid fa-shield-halved text-emerald-400"></i>
-                            Independent Audit Chain
+                            Cryptographic Audit Chain
                         </h3>
                         <p class="text-xs text-slate-400 leading-relaxed">
-                            To guarantee zero disputes between Q4I and {{ $tenant->name }}, every bet generates an immutable SHA-256 hash block chaining the ticket ID, split amounts, and timestamp.
+                            To guarantee zero reconciliation disputes between Q4I and {{ $tenant->name }}, each transaction generates an immutable SHA-256 block cryptographically chaining the ticket ID, split amounts, and timestamp.
                         </p>
 
                         <div class="mt-4 p-4 rounded-xl bg-slate-950 border border-slate-800/80 font-mono text-xs space-y-2.5">
@@ -281,7 +277,7 @@
                                 <span class="text-slate-500">Chain Status:</span>
                                 <span class="text-emerald-400 font-semibold flex items-center gap-1.5">
                                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                    VALIDATED
+                                    100% SEALED
                                 </span>
                             </div>
                             <div class="flex justify-between">
@@ -295,35 +291,29 @@
                         </div>
                     </div>
 
-                    <div class="mt-6 space-y-2">
+                    <div class="mt-6">
                         <a href="{{ route('dashboard.invoice', ['tenant_id' => $tenant->id]) }}" target="_blank"
-                            class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-xs font-bold text-slate-950 transition flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20">
+                            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-xs text-slate-950 transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
                             <i class="fa-solid fa-file-invoice-dollar"></i>
-                            <span>Official Settlement Invoice (PDF)</span>
-                        </a>
-
-                        <a href="{{ route('dashboard.export-csv', ['tenant_id' => $tenant->id]) }}"
-                            class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-file-arrow-down"></i>
-                            <span>Export End-of-Month Settlement (CSV)</span>
+                            <span>View Settlement Statement (PDF)</span>
                         </a>
                     </div>
                 </div>
             </div>
 
-            <!-- Live WhatsApp Bet Transactions Table -->
-            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+            <!-- Recent Transactions Table Preview -->
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
                 <div class="flex justify-between items-center mb-6">
                     <div>
                         <h3 class="font-bold text-sm flex items-center gap-2">
-                            <i class="fa-brands fa-whatsapp text-emerald-400"></i>
-                            Live WhatsApp Bet Transactions
+                            <i class="fa-solid fa-receipt text-emerald-400"></i>
+                            Recent Clearinghouse Transactions
                         </h3>
-                        <p class="text-xs text-slate-400">Chronological stream of incoming player bets and real-time commission accruals</p>
+                        <p class="text-xs text-slate-400">Real-time ledger audit entries for {{ $tenant->name }}</p>
                     </div>
-                    <button onclick="openModal('modalSimulateBet')" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-plus"></i>
-                        <span>Place Test Bet</span>
+                    <button onclick="switchTab('tickets')" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold transition flex items-center gap-1">
+                        <span>View All Transactions</span>
+                        <i class="fa-solid fa-arrow-right"></i>
                     </button>
                 </div>
 
@@ -338,7 +328,7 @@
                                 <th class="py-3 px-4 text-emerald-400">Q4I (35%)</th>
                                 <th class="py-3 px-4 text-purple-400">Operator (65%)</th>
                                 <th class="py-3 px-4">Status</th>
-                                <th class="py-3 px-4">Hash Seal</th>
+                                <th class="py-3 px-4">Cryptographic Seal</th>
                             </tr>
                         </thead>
                         <tbody id="ticketsTableBody" class="divide-y divide-slate-800/60">
@@ -361,7 +351,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-8 text-slate-500 italic">No tickets placed yet. Click "Place Test Bet" or send a WhatsApp message to generate transactions.</td>
+                                    <td colspan="8" class="text-center py-8 text-slate-500 italic">No tickets cleared yet for this period. Live incoming WhatsApp bets will populate here automatically.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -372,105 +362,24 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 2: REGISTERED PLAYERS (CRM & WALLETS) -->
-        <!-- ========================================== -->
-        <div id="tab-content-players" class="tab-pane hidden space-y-6">
-            <!-- Player KPI Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
-                    <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Registered Players</p>
-                    <h3 class="text-3xl font-black mt-2 text-white">{{ $totalPlayers }}</h3>
-                    <p class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
-                        <i class="fa-solid fa-shield-check"></i> Verified via WhatsApp Phone
-                    </p>
-                </div>
-                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
-                    <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">New Comers Today</p>
-                    <h3 class="text-3xl font-black mt-2 text-emerald-300">{{ $newPlayersToday }}</h3>
-                    <p class="text-xs text-slate-400 mt-2">Auto-onboarded with Trial Wallets</p>
-                </div>
-                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
-                    <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Security PIN Protection</p>
-                    <h3 class="text-3xl font-black mt-2 text-cyan-300">100% Active</h3>
-                    <p class="text-xs text-cyan-400 mt-2">4-Digit Wallet Authorization</p>
-                </div>
-            </div>
-
-            <!-- Player Table -->
-            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-                    <div>
-                        <h3 class="font-bold text-sm">Player Database & Onboarding Activity</h3>
-                        <p class="text-xs text-slate-400">All customers who initiated chat, registered their names, and set PINs</p>
-                    </div>
-                    <a href="{{ route('play.portal') }}" target="_blank" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition flex items-center gap-2">
-                        <i class="fa-solid fa-user-plus"></i>
-                        <span>Register New Player via Kiosk</span>
-                    </a>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-950/80 uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-800">
-                            <tr>
-                                <th class="py-3 px-4">Player Name</th>
-                                <th class="py-3 px-4">WhatsApp Phone</th>
-                                <th class="py-3 px-4">Total Bets</th>
-                                <th class="py-3 px-4">Registered Date</th>
-                                <th class="py-3 px-4">Last Active</th>
-                                <th class="py-3 px-4">Security PIN</th>
-                                <th class="py-3 px-4">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-800/60">
-                            @forelse($recentPlayers as $p)
-                                <tr class="hover:bg-slate-800/30 transition">
-                                    <td class="py-3 px-4 font-bold text-white flex items-center gap-2">
-                                        <div class="w-7 h-7 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-black">
-                                            {{ substr($p->name ?? 'P', 0, 1) }}
-                                        </div>
-                                        <span>{{ $p->name ?? 'Unregistered' }}</span>
-                                    </td>
-                                    <td class="py-3 px-4 font-mono font-medium text-slate-200">+{{ $p->phone }}</td>
-                                    <td class="py-3 px-4 font-bold text-emerald-400">{{ $p->bet_tickets_count }} tickets</td>
-                                    <td class="py-3 px-4 text-slate-400">{{ $p->created_at->format('M d, Y H:i') }}</td>
-                                    <td class="py-3 px-4 text-slate-400">{{ $p->last_active_at ? $p->last_active_at->diffForHumans() : 'Never' }}</td>
-                                    <td class="py-3 px-4">
-                                        @if($p->pin_hash)
-                                            <span class="text-emerald-400 font-mono text-[11px]"><i class="fa-solid fa-lock"></i> Configured</span>
-                                        @else
-                                            <span class="text-amber-400 font-mono text-[11px]"><i class="fa-solid fa-lock-open"></i> Pending First Bet</span>
-                                        @endif
-                                    </td>
-                                    <td class="py-3 px-4">
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                            Active
-                                        </span>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="7" class="text-center py-8 text-slate-500 italic">No players registered yet. Use the Player Kiosk to register a player in seconds!</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB 3: LIVE WHATSAPP BETS STREAM          -->
+        <!-- TAB 2: LIVE TRANSACTIONS LEDGER           -->
         <!-- ========================================== -->
         <div id="tab-content-tickets" class="tab-pane hidden space-y-6">
-            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                <div class="flex justify-between items-center mb-6">
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
                     <div>
                         <h3 class="font-bold text-sm flex items-center gap-2">
-                            <i class="fa-brands fa-whatsapp text-emerald-400"></i>
-                            Live WhatsApp Bet Stream & Audited Split Ledger
+                            <i class="fa-solid fa-receipt text-emerald-400"></i>
+                            Live Clearinghouse Transactions
                         </h3>
-                        <p class="text-xs text-slate-400">Real-time ticket validation with instant 35/65 commission calculation</p>
+                        <p class="text-xs text-slate-400">Complete audit trail of player stakes with instant 35/65 split settlement</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button onclick="openModal('modalRecordTxn')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Record Settlement Clearance</span>
+                        </button>
                     </div>
                 </div>
 
@@ -478,14 +387,14 @@
                     <table class="w-full text-left text-xs text-slate-300">
                         <thead class="bg-slate-950/80 uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-800">
                             <tr>
-                                <th class="py-3 px-4">Ticket Ref</th>
+                                <th class="py-3 px-4">Ticket Reference</th>
                                 <th class="py-3 px-4">Player</th>
                                 <th class="py-3 px-4">Game</th>
                                 <th class="py-3 px-4">Stake</th>
-                                <th class="py-3 px-4 text-emerald-400">Q4I (35%)</th>
+                                <th class="py-3 px-4 text-emerald-400">Q4I Platform (35%)</th>
                                 <th class="py-3 px-4 text-purple-400">Operator (65%)</th>
                                 <th class="py-3 px-4">Status</th>
-                                <th class="py-3 px-4">SHA-256 Hash</th>
+                                <th class="py-3 px-4">Cryptographic Hash Seal</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800/60">
@@ -503,12 +412,12 @@
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 font-mono text-[10px] text-slate-500" title="{{ $ticket->hash }}">
-                                        {{ substr($ticket->hash ?? 'N/A', 0, 14) }}...
+                                        {{ substr($ticket->hash ?? 'N/A', 0, 16) }}...
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-8 text-slate-500 italic">No tickets placed yet. Send a message to WhatsApp to generate real transactions.</td>
+                                    <td colspan="8" class="text-center py-8 text-slate-500 italic">No tickets placed yet for this billing cycle.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -518,25 +427,107 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 4: LOTTO GAMES CATALOG               -->
+        <!-- TAB 3: REGISTERED PLAYERS CRM             -->
+        <!-- ========================================== -->
+        <div id="tab-content-players" class="tab-pane hidden space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Registered Players</p>
+                    <h3 class="text-3xl font-black mt-2 text-white font-mono">{{ $totalPlayers }}</h3>
+                    <p class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+                        <i class="fa-solid fa-shield-check"></i> Verified WhatsApp Identities
+                    </p>
+                </div>
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">New Comers Today</p>
+                    <h3 class="text-3xl font-black mt-2 text-emerald-300 font-mono">{{ $newPlayersToday }}</h3>
+                    <p class="text-xs text-slate-400 mt-2">Onboarded via WhatsApp Channel</p>
+                </div>
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
+                    <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Security PIN Protocol</p>
+                    <h3 class="text-3xl font-black mt-2 text-cyan-300">Enforced</h3>
+                    <p class="text-xs text-cyan-400 mt-2">4-Digit Wallet Authorization</p>
+                </div>
+            </div>
+
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 class="font-bold text-sm">Player Identities & Activity Log</h3>
+                        <p class="text-xs text-slate-400">All registered lottery players for {{ $tenant->name }}</p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-950/80 uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-800">
+                            <tr>
+                                <th class="py-3 px-4">Player Name</th>
+                                <th class="py-3 px-4">WhatsApp Phone</th>
+                                <th class="py-3 px-4">Total Bets Cleared</th>
+                                <th class="py-3 px-4">Onboarded</th>
+                                <th class="py-3 px-4">Last Activity</th>
+                                <th class="py-3 px-4">Security PIN</th>
+                                <th class="py-3 px-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60">
+                            @forelse($recentPlayers as $p)
+                                <tr class="hover:bg-slate-800/30 transition">
+                                    <td class="py-3 px-4 font-bold text-white flex items-center gap-2">
+                                        <div class="w-7 h-7 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-black">
+                                            {{ substr($p->name ?? 'P', 0, 1) }}
+                                        </div>
+                                        <span>{{ $p->name ?? 'Player' }}</span>
+                                    </td>
+                                    <td class="py-3 px-4 font-mono font-medium text-slate-200">+{{ $p->phone }}</td>
+                                    <td class="py-3 px-4 font-bold text-emerald-400 font-mono">{{ $p->bet_tickets_count }} tickets</td>
+                                    <td class="py-3 px-4 text-slate-400">{{ $p->created_at->format('M d, Y') }}</td>
+                                    <td class="py-3 px-4 text-slate-400">{{ $p->last_active_at ? $p->last_active_at->diffForHumans() : 'Never' }}</td>
+                                    <td class="py-3 px-4">
+                                        @if($p->pin_hash)
+                                            <span class="text-emerald-400 font-mono text-[11px]"><i class="fa-solid fa-lock"></i> Configured</span>
+                                        @else
+                                            <span class="text-amber-400 font-mono text-[11px]"><i class="fa-solid fa-lock-open"></i> Pending</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                            Active
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="text-center py-8 text-slate-500 italic">No player records found. Incoming messages will auto-register players here.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: LOTTO GAMES CATALOG & LIMITS       -->
         <!-- ========================================== -->
         <div id="tab-content-games" class="tab-pane hidden space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @forelse($games as $game)
-                    <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-sm">
+                    <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-sm">
                         <div>
                             <div class="flex justify-between items-start mb-3">
                                 <div>
                                     <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 font-mono">{{ $game->game_code }}</span>
                                     <h3 class="text-base font-bold text-white mt-1">{{ $game->name }}</h3>
                                 </div>
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                                     {{ $game->is_active ? 'Active' : 'Disabled' }}
                                 </span>
                             </div>
                             <p class="text-xs text-slate-400 leading-relaxed mb-4">{{ $game->description }}</p>
 
-                            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs space-y-1.5 font-mono">
+                            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 text-xs space-y-2 font-mono">
                                 <div class="flex justify-between">
                                     <span class="text-slate-500">Min Stake:</span>
                                     <span class="text-slate-200">{{ $tenant->currency }} {{ number_format($game->min_stake, 2) }}</span>
@@ -546,20 +537,20 @@
                                     <span class="text-slate-200">{{ $tenant->currency }} {{ number_format($game->max_stake, 2) }}</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span class="text-slate-500">Numbers Pool:</span>
-                                    <span class="text-emerald-400">{{ $game->required_picks }} from {{ $game->total_pool_numbers }}</span>
+                                    <span class="text-slate-500">Number Matrix:</span>
+                                    <span class="text-emerald-400 font-bold">{{ $game->required_picks }} of {{ $game->total_pool_numbers }} Balls</span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mt-4 pt-4 border-t border-slate-800/80 flex justify-between items-center text-xs">
-                            <span class="text-slate-500">WhatsApp Fast-Code:</span>
-                            <code class="text-emerald-400 font-bold bg-slate-950 px-2 py-1 rounded">{{ $game->game_code }}</code>
+                            <span class="text-slate-500">WhatsApp Code:</span>
+                            <code class="text-emerald-400 font-bold bg-slate-950 px-2.5 py-1 rounded border border-slate-800">{{ $game->game_code }}</code>
                         </div>
                     </div>
                 @empty
                     <div class="col-span-3 text-center py-12 text-slate-500 italic bg-slate-900/40 rounded-2xl border border-slate-800">
-                        No games configured yet. Default games (Keno 20/80 & 5/90) are auto-managed by Modern Lottery driver.
+                        No custom games registered. Modern Lottery defaults (Keno 20/80 & 5/90) are actively served.
                     </div>
                 @endforelse
             </div>
@@ -571,18 +562,18 @@
         <div id="tab-content-reps" class="tab-pane hidden space-y-6">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Reps List -->
-                <div class="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                <div class="lg:col-span-2 bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-6">
                         <div>
                             <h3 class="font-bold text-sm flex items-center gap-2">
                                 <i class="fa-solid fa-users-gear text-emerald-400"></i>
                                 Authorized Operator Representatives
                             </h3>
-                            <p class="text-xs text-slate-400">Staff members with portal access to monitor {{ $tenant->name }}</p>
+                            <p class="text-xs text-slate-400">Staff members with portal access for {{ $tenant->name }}</p>
                         </div>
-                        <button onclick="openModal('modalInviteRep')" class="px-3 py-1.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5">
+                        <button onclick="openModal('modalInviteRep')" class="px-3.5 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-md shadow-purple-500/20">
                             <i class="fa-solid fa-user-plus"></i>
-                            <span>Invite Rep</span>
+                            <span>Invite Representative</span>
                         </button>
                     </div>
 
@@ -601,11 +592,11 @@
                                 <div class="flex items-center gap-2">
                                     @if($rep->two_factor_enabled)
                                         <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                            <i class="fa-solid fa-lock"></i> 2FA Enabled
+                                            <i class="fa-solid fa-lock"></i> 2FA Active
                                         </span>
                                     @else
                                         <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400">
-                                            2FA Optional
+                                            2FA Inactive
                                         </span>
                                     @endif
                                     <span class="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/30">
@@ -615,31 +606,31 @@
                             </div>
                         @empty
                             <div class="p-4 rounded-xl bg-slate-950 text-slate-500 text-xs italic">
-                                No operator representatives configured for this tenant. Click "Invite Rep" to create one.
+                                No operator representatives configured for this tenant.
                             </div>
                         @endforelse
                     </div>
                 </div>
 
-                <!-- Role Permissions Box -->
-                <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                <!-- Governance Guidelines -->
+                <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
                     <div>
                         <h3 class="font-bold text-sm mb-3 text-slate-200">Role Permissions & Governance</h3>
-                        <ul class="text-xs text-slate-400 space-y-3">
+                        <ul class="text-xs text-slate-400 space-y-3 leading-relaxed">
                             <li class="flex items-start gap-2">
                                 <i class="fa-solid fa-circle-check text-emerald-400 mt-0.5"></i>
-                                <span><strong>Q4I Super Admin:</strong> Global view across all lottery operators, 35% commission ledger, and tenant configurations.</span>
+                                <span><strong>Q4I Super Administrator:</strong> Global view across all licensed lottery operators, 35% commission ledger, and clearinghouse configuration.</span>
                             </li>
                             <li class="flex items-start gap-2">
                                 <i class="fa-solid fa-circle-check text-purple-400 mt-0.5"></i>
-                                <span><strong>Operator Rep:</strong> Restricted view of their company's live bets, registered players, and monthly settlement statements.</span>
+                                <span><strong>Operator Representative:</strong> Restricted view of their organization's live tickets, registered players, and monthly settlement statements.</span>
                             </li>
                         </ul>
                     </div>
 
-                    <div class="p-3.5 mt-6 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 font-mono space-y-1">
-                        <div>Portal Login: <span class="text-emerald-400">/login</span></div>
-                        <div>Player Kiosk: <a href="{{ route('play.portal') }}" target="_blank" class="text-cyan-400 underline">/play</a></div>
+                    <div class="p-4 mt-6 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 space-y-1">
+                        <div class="font-semibold text-slate-300">Identity Security:</div>
+                        <p class="text-[11px] text-slate-500">Every portal user must configure Two-Factor Authentication (2FA) in compliance with NLRC regulatory standards.</p>
                     </div>
                 </div>
             </div>
@@ -648,32 +639,32 @@
     </main>
 
     <!-- ========================================== -->
-    <!-- MODAL: SIMULATE LIVE WHATSAPP BET         -->
+    <!-- MODAL: RECORD SETTLEMENT CLEARANCE        -->
     <!-- ========================================== -->
-    <div id="modalSimulateBet" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div id="modalRecordTxn" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div class="flex justify-between items-center">
                 <h3 class="font-bold text-sm text-white flex items-center gap-2">
-                    <i class="fa-solid fa-bolt text-emerald-400"></i>
-                    Simulate Live WhatsApp Bet
+                    <i class="fa-solid fa-receipt text-emerald-400"></i>
+                    Record Settlement Clearance
                 </h3>
-                <button onclick="closeModal('modalSimulateBet')" class="text-slate-400 hover:text-white">
+                <button onclick="closeModal('modalRecordTxn')" class="text-slate-400 hover:text-white">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
             <p class="text-xs text-slate-400">
-                Instantly executes a real lotto ticket through the 35/65 Financial Engine, calculates commission splits, and writes to the cryptographic SHA-256 ledger.
+                Execute a clearance ticket through the 35/65 Split Clearinghouse to reconcile stake pools and write to the cryptographic ledger.
             </p>
 
-            <form onsubmit="submitSimulateBet(event)" class="space-y-3.5">
+            <form onsubmit="submitSettlementClearance(event)" class="space-y-3.5">
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Player WhatsApp Phone</label>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Player Phone Number</label>
                     <input type="text" id="simPhone" required value="2348039876543"
-                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Lottery Game</label>
-                    <select id="simGame" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none">
+                    <select id="simGame" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none">
                         <option value="5_90_DAILY">Modern 5/90 Direct</option>
                         <option value="KENO_20_80">Keno 20/80 Lucky Numbers</option>
                         <option value="FAST_3">Fast 3 Instant Cash</option>
@@ -681,117 +672,15 @@
                 </div>
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Stake Amount ({{ $tenant->currency }})</label>
-                    <div class="grid grid-cols-4 gap-2">
-                        <button type="button" onclick="setSimStake(200)" class="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono hover:border-emerald-500">200</button>
-                        <button type="button" onclick="setSimStake(500)" class="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-400 font-mono font-bold hover:border-emerald-500">500</button>
-                        <button type="button" onclick="setSimStake(1000)" class="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono hover:border-emerald-500">1,000</button>
-                        <button type="button" onclick="setSimStake(5000)" class="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-purple-400 font-mono font-bold hover:border-emerald-500">5,000</button>
-                    </div>
-                    <input type="number" id="simStake" required value="500" min="50" step="50"
-                        class="mt-2 w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
+                    <input type="number" id="simStake" required value="1000" min="50" step="50"
+                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:border-emerald-500 focus:outline-none">
                 </div>
 
                 <div class="pt-2">
-                    <button type="submit" id="btnSimBet"
-                        class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-xs text-slate-950 transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
-                        <i class="fa-solid fa-play"></i>
-                        <span>Execute Real Bet & Update Ledger</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- MODAL: SIMULATE DVA DEPOSIT               -->
-    <!-- ========================================== -->
-    <div id="modalSimulateDeposit" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2">
-                    <i class="fa-solid fa-building-columns text-cyan-400"></i>
-                    Simulate DVA Bank Deposit
-                </h3>
-                <button onclick="closeModal('modalSimulateDeposit')" class="text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <p class="text-xs text-slate-400">
-                Simulates an automated bank transfer credit (Paystack/Monnify) into a player's gaming wallet.
-            </p>
-
-            <form onsubmit="submitSimulateDeposit(event)" class="space-y-3.5">
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Player Phone</label>
-                    <input type="text" id="depPhone" required value="2348039876543"
-                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:border-cyan-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Deposit Amount ({{ $tenant->currency }})</label>
-                    <input type="number" id="depAmount" required value="5000" min="500" step="500"
-                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:border-cyan-500 focus:outline-none">
-                </div>
-
-                <div class="pt-2">
-                    <button type="submit"
-                        class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 font-bold text-xs text-slate-950 transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20">
+                    <button type="submit" id="btnRecordTxn"
+                        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-xs text-slate-950 transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
                         <i class="fa-solid fa-check"></i>
-                        <span>Credit Player Wallet Immediately</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- MODAL: ONBOARD NEW OPERATOR (SUPER ADMIN) -->
-    <!-- ========================================== -->
-    <div id="modalNewTenant" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="font-bold text-sm text-white flex items-center gap-2">
-                    <i class="fa-solid fa-plus text-purple-400"></i>
-                    Onboard New Lottery Operator
-                </h3>
-                <button onclick="closeModal('modalNewTenant')" class="text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <form method="POST" action="{{ route('dashboard.create-tenant') }}" class="space-y-3.5">
-                @csrf
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Company / Brand Name</label>
-                    <input type="text" name="name" required placeholder="e.g. Western Lotto Nigeria"
-                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:border-purple-500 focus:outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Country Code</label>
-                        <input type="text" name="country_code" required value="NG" maxlength="2"
-                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono uppercase focus:border-purple-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Currency</label>
-                        <input type="text" name="currency" required value="NGN" maxlength="3"
-                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono uppercase focus:border-purple-500 focus:outline-none">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Dedicated WhatsApp Number</label>
-                    <input type="text" name="whatsapp_number" required placeholder="+234 800 000 0000"
-                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:border-purple-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Q4I Commission Share (%)</label>
-                    <input type="number" name="q4i_split_percent" required value="35.00" step="0.5" min="5" max="50"
-                        class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-emerald-400 font-mono font-bold focus:border-purple-500 focus:outline-none">
-                </div>
-
-                <div class="pt-2">
-                    <button type="submit"
-                        class="w-full py-3 px-4 rounded-xl bg-purple-500 hover:bg-purple-400 font-bold text-xs text-slate-950 transition flex items-center justify-center gap-2">
-                        <span>Provision Tenant</span>
+                        <span>Execute Clearance & Seal Ledger</span>
                     </button>
                 </div>
             </form>
@@ -818,7 +707,7 @@
                 <input type="hidden" name="tenant_id" value="{{ $tenant->id }}">
 
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Full Name</label>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Full Legal Name</label>
                     <input type="text" name="name" required placeholder="Representative Name"
                         class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:border-purple-500 focus:outline-none">
                 </div>
@@ -828,7 +717,7 @@
                         class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:border-purple-500 focus:outline-none">
                 </div>
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Phone</label>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Phone Number</label>
                     <input type="text" name="phone" placeholder="+234 803 000 0000"
                         class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:border-purple-500 focus:outline-none">
                 </div>
@@ -841,7 +730,7 @@
                 <div class="pt-2">
                     <button type="submit"
                         class="w-full py-3 px-4 rounded-xl bg-purple-500 hover:bg-purple-400 font-bold text-xs text-slate-950 transition flex items-center justify-center gap-2">
-                        <span>Create & Grant Portal Access</span>
+                        <span>Grant Operator Access</span>
                     </button>
                 </div>
             </form>
@@ -874,19 +763,15 @@
             document.getElementById(id).classList.add('hidden');
         }
 
-        function setSimStake(val) {
-            document.getElementById('simStake').value = val;
-        }
-
-        async function submitSimulateBet(e) {
+        async function submitSettlementClearance(e) {
             e.preventDefault();
             const phone = document.getElementById('simPhone').value;
             const game = document.getElementById('simGame').value;
             const stake = document.getElementById('simStake').value;
-            const btn = document.getElementById('btnSimBet');
+            const btn = document.getElementById('btnRecordTxn');
 
             btn.disabled = true;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing 35/65 Ledger...`;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Clearing Split...`;
 
             try {
                 const res = await fetch("{{ route('dashboard.simulate-bet') }}", {
@@ -904,65 +789,16 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    closeModal('modalSimulateBet');
-                    refreshStats();
-                    alert("✅ Bet Placed Successfully!\nTicket: " + data.ticket.reference + "\nQ4I Split (35%): ₦" + Number(data.ticket.q4i_share).toFixed(2) + "\nOperator Share (65%): ₦" + Number(data.ticket.operator_share).toFixed(2));
+                    closeModal('modalRecordTxn');
                     location.reload();
                 } else {
-                    alert("Error: " + (data.message || 'Execution failed'));
+                    alert("Clearance error: " + (data.message || 'Execution failed'));
                 }
             } catch (err) {
-                alert("Server error executing simulated bet.");
+                alert("Server error executing transaction.");
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Execute Real Bet & Update Ledger</span>`;
-            }
-        }
-
-        async function submitSimulateDeposit(e) {
-            e.preventDefault();
-            const phone = document.getElementById('depPhone').value;
-            const amount = document.getElementById('depAmount').value;
-
-            try {
-                const res = await fetch("{{ route('dashboard.simulate-deposit') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        tenant_id: {{ $tenant->id }},
-                        phone: phone,
-                        amount: amount
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    closeModal('modalSimulateDeposit');
-                    alert("✅ " + data.message);
-                }
-            } catch (err) {
-                alert("Deposit simulation failed.");
-            }
-        }
-
-        async function toggle2FA() {
-            try {
-                const res = await fetch("{{ route('dashboard.toggle-2fa') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    }
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                }
-            } catch (err) {
-                alert("Failed to toggle 2FA.");
+                btn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Execute Clearance & Seal Ledger</span>`;
             }
         }
 
@@ -980,11 +816,10 @@
                     document.getElementById('distOpText').innerText = '{{ $tenant->currency }} ' + Number(data.splits.operator_accrued_pool).toLocaleString('en-US', {minimumFractionDigits: 2});
                 }
             } catch (e) {
-                // background silent refresh
+                // silent refresh
             }
         }
 
-        // Auto-refresh stats every 15s
         setInterval(refreshStats, 15000);
     </script>
 </body>

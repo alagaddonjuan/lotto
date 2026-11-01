@@ -9,6 +9,7 @@ use Database\Seeders\ModernLotterySeeder;
 use Database\Seeders\ModernLotteryUssdMenuSeeder;
 use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -66,12 +67,13 @@ class AuthAndPlayerPortalTest extends TestCase
         $response->assertRedirect('/two-factor-challenge');
         $this->assertGuest();
 
-        // Solve challenge using demo master code '123456'
+        // Solve challenge using the actual generated OTP or test helper
+        $actualOtp = $user->fresh()->two_factor_code;
         $verifyResponse = $this->withSession([
             'auth.2fa.id' => $user->id,
             'auth.2fa.remember' => false,
         ])->post('/two-factor-challenge', [
-            'code' => '123456',
+            'code' => $actualOtp,
         ]);
 
         $verifyResponse->assertRedirect('/dashboard');
@@ -86,11 +88,16 @@ class AuthAndPlayerPortalTest extends TestCase
             'email' => 'admin@q4iltd.com',
         ]);
 
-        $forgotResponse->assertSessionHas('reset_url');
+        $forgotResponse->assertSessionHas('status');
 
-        $resetUrl = session('reset_url');
-        parse_str(parse_url($resetUrl, PHP_URL_QUERY), $params);
-        $token = basename(parse_url($resetUrl, PHP_URL_PATH));
+        $token = 'test-token-secret-123456';
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => 'admin@q4iltd.com'],
+            [
+                'token' => Hash::make($token),
+                'created_at' => now(),
+            ]
+        );
 
         $resetResponse = $this->post('/reset-password', [
             'token' => $token,

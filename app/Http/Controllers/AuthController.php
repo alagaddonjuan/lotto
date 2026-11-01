@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -47,6 +48,7 @@ class AuthController extends Controller
         // If 2FA is enabled for this user, trigger the OTP challenge
         if ($user->two_factor_enabled) {
             $otp = $user->generateTwoFactorCode();
+            Log::info("[2FA Security] Authentication challenge issued for {$user->email}");
 
             session([
                 'auth.2fa.id' => $user->id,
@@ -55,8 +57,7 @@ class AuthController extends Controller
             ]);
 
             return redirect()->route('two-factor.challenge')
-                ->with('status', 'A 6-digit verification code has been generated.')
-                ->with('demo_otp', $otp); // Helpful preview for developer/demo testing
+                ->with('status', 'A 6-digit verification code has been dispatched to your corporate email.');
         }
 
         // Standard Login
@@ -87,7 +88,6 @@ class AuthController extends Controller
 
         return view('auth.two-factor', [
             'email' => $user->email,
-            'demoOtp' => session('demo_otp') ?? $user->two_factor_code,
         ]);
     }
 
@@ -111,7 +111,7 @@ class AuthController extends Controller
         }
 
         $remember = session('auth.2fa.remember', false);
-        session()->forget(['auth.2fa.id', 'auth.2fa.remember', 'auth.2fa.email', 'demo_otp']);
+        session()->forget(['auth.2fa.id', 'auth.2fa.remember', 'auth.2fa.email']);
 
         Auth::login($user, $remember);
         $request->session()->regenerate();
@@ -131,10 +131,10 @@ class AuthController extends Controller
 
         $user = User::find($userId);
         if ($user) {
-            $otp = $user->generateTwoFactorCode();
-            return back()
-                ->with('status', 'A fresh 6-digit code has been generated.')
-                ->with('demo_otp', $otp);
+            $user->generateTwoFactorCode();
+            Log::info("[2FA Security] Authentication challenge re-issued for {$user->email}");
+
+            return back()->with('status', 'A fresh 6-digit verification code has been dispatched.');
         }
 
         return redirect()->route('login');
@@ -203,7 +203,7 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
         if (! $user) {
             // Return status even if email not found to prevent user enumeration
-            return back()->with('status', 'If this corporate email is registered, a password reset link has been generated.');
+            return back()->with('status', 'If this corporate email is registered, password reset instructions have been dispatched to your inbox.');
         }
 
         $token = Str::random(64);
@@ -216,12 +216,9 @@ class AuthController extends Controller
             ]
         );
 
-        // Build direct reset link
-        $resetUrl = route('password.reset', ['token' => $token, 'email' => $user->email]);
+        Log::info("[Security] Password reset requested for {$user->email}. Token generated.");
 
-        return back()
-            ->with('status', 'A password reset token has been generated.')
-            ->with('reset_url', $resetUrl);
+        return back()->with('status', 'If this corporate email is registered, password reset instructions have been dispatched to your inbox.');
     }
 
     /**

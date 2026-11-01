@@ -16,7 +16,7 @@
                 Q
             </div>
             <h1 class="text-2xl font-black text-white tracking-tight">Q4I Financial Engine</h1>
-            <p class="text-xs text-slate-400 mt-1">Multi-Tenant Lottery Operator & Commission Portal</p>
+            <p class="text-xs text-slate-400 mt-1">Multi-Tenant Lottery Operator & Commission Clearinghouse</p>
         </div>
 
         <!-- Login Card -->
@@ -39,13 +39,13 @@
                 @csrf
 
                 <div>
-                    <label for="email" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Corporate Email</label>
+                    <label for="email" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Corporate Work Email</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500 text-sm">
                             <i class="fa-solid fa-envelope"></i>
                         </span>
                         <input type="email" id="email" name="email" value="{{ old('email') }}" required autofocus
-                            placeholder="rep@modernlottery.ng or admin@q4iltd.com"
+                            placeholder="name@modernlottery.ng or admin@q4iltd.com"
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
                     </div>
                 </div>
@@ -73,7 +73,7 @@
                         <span>Remember session</span>
                     </label>
                     <span class="text-slate-500 flex items-center gap-1">
-                        <i class="fa-solid fa-shield-halved text-[10px]"></i> 2FA Ready
+                        <i class="fa-solid fa-shield-halved text-[10px]"></i> 2FA Protected
                     </span>
                 </div>
 
@@ -85,30 +85,11 @@
             </form>
 
             <!-- Registration Link -->
-            <div class="mt-6 text-center text-xs text-slate-400">
+            <div class="mt-8 pt-6 border-t border-slate-800 text-center text-xs text-slate-400">
                 New operator representative or manager?
                 <a href="{{ route('register') }}" class="text-emerald-400 hover:text-emerald-300 font-bold ml-1 transition">
                     Register Operator Account &rarr;
                 </a>
-            </div>
-
-            <!-- Pre-Configured Demo Accounts -->
-            <div class="mt-8 pt-6 border-t border-slate-800 text-xs">
-                <p class="text-slate-500 font-semibold uppercase tracking-wider text-[10px] mb-3">Instant Demo Logins</p>
-                <div class="space-y-2">
-                    <button type="button" onclick="fillCreds('admin@q4iltd.com', 'admin123456')" class="w-full text-left p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800/80 text-slate-300 flex justify-between items-center transition">
-                        <div>
-                            <span class="font-semibold text-emerald-400">Q4I Super Admin:</span> admin@q4iltd.com
-                        </div>
-                        <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono">admin123456</span>
-                    </button>
-                    <button type="button" onclick="fillCreds('rep@modernlottery.ng', 'rep123456')" class="w-full text-left p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800/80 text-slate-300 flex justify-between items-center transition">
-                        <div>
-                            <span class="font-semibold text-purple-400">Modern Lottery Rep:</span> rep@modernlottery.ng
-                        </div>
-                        <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono">rep123456</span>
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -116,17 +97,9 @@
         <div class="text-center mt-6 text-slate-600 text-xs flex justify-center items-center gap-4">
             <span>&copy; {{ date('Y') }} Q4I Limited</span>
             <span>&bull;</span>
-            <span>NLRC Licensed Integration</span>
-            <span>&bull;</span>
-            <a href="{{ route('play.portal') }}" class="text-slate-400 hover:text-slate-200 underline">Player Test Kiosk</a>
+            <span>NLRC Licensed Clearinghouse Node</span>
         </div>
     </div>
 
-    <script>
-        function fillCreds(email, password) {
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = password;
-        }
-    </script>
 </body>
 </html>

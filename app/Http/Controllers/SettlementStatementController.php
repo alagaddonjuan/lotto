@@ -95,3 +95,4 @@ class SettlementStatementController extends Controller
         return view('dashboard.settlement-invoice', compact('tenant', 'balanceSheet', 'recentTickets'));
     }
 }
+
