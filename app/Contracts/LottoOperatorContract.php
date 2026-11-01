@@ -39,6 +39,11 @@ interface LottoOperatorContract
     public function placeBet(string $phone, string $gameCode, array $numbers, float $stake, string $idempotencyKey): array;
 
     /**
+     * Credit a player's wallet from automated deposit (e.g. DVA transfer).
+     */
+    public function creditWallet(string $phone, float $amount, string $reference): array;
+
+    /**
      * Fetch latest winning results for a specific game or draw.
      */
     public function getResults(string $gameCode, ?string $drawDate = null): array;

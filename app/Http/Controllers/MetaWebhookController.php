@@ -67,7 +67,11 @@ class MetaWebhookController extends Controller
 
         if (!empty($messageDTO->rawBody)) {
             try {
-                $this->engine->handle($tenant, $messageDTO);
+                if (config('queue.default') === 'sync') {
+                    $this->engine->handle($tenant, $messageDTO);
+                } else {
+                    \App\Jobs\ProcessWhatsAppWebhookJob::dispatch($tenant, $messageDTO);
+                }
             } catch (\Throwable $e) {
                 Log::error('[MetaWebhook] Engine error: ' . $e->getMessage());
             }

@@ -26,10 +26,11 @@ class ModernLotteryDriver implements LottoOperatorContract
     public function checkWalletBalance(string $phone): array
     {
         // Mock response if in local testing or external API not configured
-        if ($this->apiKey === 'mock_key' || app()->environment('local')) {
+        if ($this->apiKey === 'mock_key' || app()->environment('local', 'testing')) {
+            $balance = (float) \Illuminate\Support\Facades\Cache::get("mock_wallet:{$phone}", 4500.00);
             return [
                 'success' => true,
-                'balance' => 4500.00,
+                'balance' => $balance,
                 'currency' => 'NGN',
                 'is_registered' => true,
                 'message' => 'Wallet balance fetched successfully',
@@ -153,6 +154,47 @@ class ModernLotteryDriver implements LottoOperatorContract
                 'message' => 'Partner API timeout. Please verify your balance before retrying.',
             ];
         }
+    }
+
+    public function creditWallet(string $phone, float $amount, string $reference): array
+    {
+        if ($this->apiKey === 'mock_key' || app()->environment('local', 'testing')) {
+            $current = (float) \Illuminate\Support\Facades\Cache::get("mock_wallet:{$phone}", 4500.00);
+            $current += $amount;
+            \Illuminate\Support\Facades\Cache::put("mock_wallet:{$phone}", $current, 86400 * 30);
+
+            return [
+                'success' => true,
+                'balance' => $current,
+                'message' => 'Wallet credited successfully',
+            ];
+        }
+
+        try {
+            $response = Http::withToken($this->apiKey)
+                ->timeout(5)
+                ->post("{$this->apiUrl}/wallets/credit", [
+                    'phone' => $phone,
+                    'amount' => $amount,
+                    'reference' => $reference,
+                ]);
+
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'balance' => (float)$response->json('data.balance', 0),
+                    'message' => 'Wallet credited successfully',
+                ];
+            }
+        } catch (\Throwable $e) {
+            Log::error('[ModernLotteryDriver] Wallet credit failed: ' . $e->getMessage());
+        }
+
+        return [
+            'success' => false,
+            'balance' => 0.00,
+            'message' => 'Failed to reach Modern Lottery wallet service',
+        ];
     }
 
     public function getResults(string $gameCode, ?string $drawDate = null): array

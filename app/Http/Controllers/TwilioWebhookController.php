@@ -50,9 +50,13 @@ class TwilioWebhookController extends Controller
         // 3. Parse incoming message into DTO
         $messageDTO = $driver->parseIncomingRequest($request);
 
-        // 4. Pass to conversational engine
+        // 4. Pass to conversational engine (sync or async queue)
         try {
-            $this->engine->handle($tenant, $messageDTO);
+            if (config('queue.default') === 'sync') {
+                $this->engine->handle($tenant, $messageDTO);
+            } else {
+                \App\Jobs\ProcessWhatsAppWebhookJob::dispatch($tenant, $messageDTO);
+            }
         } catch (\Throwable $e) {
             Log::error("[TwilioWebhook] Engine execution error: " . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),

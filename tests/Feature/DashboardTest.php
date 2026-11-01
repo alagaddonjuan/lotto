@@ -33,7 +33,7 @@ class DashboardTest extends TestCase
     {
         $response = $this->get('/login');
         $response->assertStatus(200);
-        $response->assertSee('Sign In to Dashboard');
+        $response->assertSee('Sign In to Portal');
         $response->assertSee('admin@q4iltd.com');
     }
 
@@ -79,5 +79,42 @@ class DashboardTest extends TestCase
 
         $this->assertEquals(35.00, $response->json('splits.q4i_percentage'));
         $this->assertEquals(65.00, $response->json('splits.operator_percentage'));
+    }
+
+    public function test_simulate_bet_api_records_35_65_split(): void
+    {
+        $tenant = Tenant::first();
+
+        $response = $this->actingAs($this->adminUser)->postJson('/api/dashboard/simulate-bet', [
+            'tenant_id' => $tenant->id,
+            'phone' => '2348039876543',
+            'game_code' => '5_90_DAILY',
+            'stake' => 1000,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+        $this->assertEquals(350.00, $response->json('ticket.q4i_share'));
+        $this->assertEquals(650.00, $response->json('ticket.operator_share'));
+    }
+
+    public function test_settlement_invoice_renders_printable_statement(): void
+    {
+        $tenant = Tenant::first();
+
+        $response = $this->actingAs($this->adminUser)->get('/dashboard/settlement-invoice?tenant_id=' . $tenant->id);
+        $response->assertStatus(200);
+        $response->assertSee('Q4I LIMITED');
+        $response->assertSee('Official Settlement Statement');
+        $response->assertSee('35.00% Fixed');
+    }
+
+    public function test_settlement_csv_exports_valid_stream(): void
+    {
+        $tenant = Tenant::first();
+
+        $response = $this->actingAs($this->adminUser)->get('/dashboard/export-settlement-csv?tenant_id=' . $tenant->id);
+        $response->assertStatus(200);
+        $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
     }
 }

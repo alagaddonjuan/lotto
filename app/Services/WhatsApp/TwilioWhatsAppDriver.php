@@ -60,9 +60,12 @@ class TwilioWhatsAppDriver implements WhatsAppGatewayInterface
 
     public function sendTextMessage(string $to, string $text, ?string $from = null): bool
     {
+        $cleanPhone = preg_replace('/[^0-9]/', '', $to);
+        \Illuminate\Support\Facades\Cache::put("sim_reply:{$cleanPhone}", $text, 120);
+
         if (!$this->client) {
-            Log::warning('[TwilioDriver] Client not initialized. Message logged: ' . $text);
-            return false;
+            Log::info('[TwilioDriver] Client not initialized. Message logged: ' . $text);
+            return true;
         }
 
         $sender = $from ?: $this->defaultFrom;

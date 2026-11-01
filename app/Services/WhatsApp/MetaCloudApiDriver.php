@@ -68,6 +68,7 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
     public function sendTextMessage(string $to, string $text, ?string $from = null): bool
     {
         $recipient = str_replace(['whatsapp:', '+', ' '], '', $to);
+        \Illuminate\Support\Facades\Cache::put("sim_reply:{$recipient}", $text, 120);
         $phoneId = $from ?: $this->phoneNumberId;
 
         $response = Http::withToken($this->accessToken)
