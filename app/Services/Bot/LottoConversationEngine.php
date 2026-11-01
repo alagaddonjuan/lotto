@@ -45,10 +45,67 @@ class LottoConversationEngine
         $sessionKey = "session:{$tenant->id}:{$phone}";
         $session = Cache::get($sessionKey, ['state' => 'USSD_MENU', 'item_id' => null, 'data' => []]);
 
+        // Newcomer Onboarding State Machine
+        if ($session['state'] === 'ONBOARDING_NAME') {
+            $name = ucwords(strtolower(trim($input)));
+            if (strlen($name) < 2 || is_numeric($name)) {
+                $gateway->sendTextMessage($phone, "👋 Please reply with your first name or nickname (e.g. *Michael*):", $tenant->whatsapp_number);
+                return;
+            }
+            $player->update(['name' => $name]);
+            Cache::put($sessionKey, ['state' => 'ONBOARDING_PIN', 'data' => ['name' => $name]], now()->addMinutes(10));
+            $msg = "Awesome to have you, *{$name}*! 🎉\n\n"
+                 . "🔐 Choose a *4-digit Security PIN* to protect your wallet and confirm winning withdrawals (e.g. *1234*):";
+            $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
+            return;
+        }
+
+        if ($session['state'] === 'ONBOARDING_PIN') {
+            $pin = trim($input);
+            if (strlen($pin) !== 4 || !ctype_digit($pin)) {
+                $gateway->sendTextMessage($phone, "⚠️ Please enter a valid *4-digit numeric PIN* (e.g. *1234*):", $tenant->whatsapp_number);
+                return;
+            }
+            $player->update(['pin_hash' => bcrypt($pin)]);
+            Cache::forget($sessionKey);
+
+            $wallet = $operator->checkWalletBalance($phone);
+            $bal = number_format($wallet['balance'] ?? 0, 2);
+
+            $msg = "✅ *Account Created Successfully!*\n"
+                 . "━━━━━━━━━━━━━━━━\n"
+                 . "👤 Account: *{$player->name}*\n"
+                 . "📱 Phone: *+{$phone}*\n"
+                 . "💰 Trial Wallet: *{$tenant->currency} {$bal}*\n"
+                 . "━━━━━━━━━━━━━━━━\n\n"
+                 . "You're all set to play and win! 🍀";
+            $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
+
+            $this->showRootMenu($gateway, $tenant, $phone, $sessionKey, $player);
+            return;
+        }
+
         // Global resets
         if (in_array($input, ['RESET', 'CANCEL', 'MENU', 'HOME', 'START', 'HI', 'HELLO'])) {
-            $this->showRootMenu($gateway, $tenant, $phone, $sessionKey);
+            // If newcomer with no name registered, initiate warm friendly onboarding
+            if (empty($player->name)) {
+                Cache::put($sessionKey, ['state' => 'ONBOARDING_NAME', 'data' => []], now()->addMinutes(10));
+                $welcome = "🎰 *Welcome to {$tenant->name}!* 👋\n"
+                         . "Nigeria's premier mobile lottery platform.\n\n"
+                         . "Win Millions daily in our *Keno 20/80* and *Ghana 5/90* draws!\n\n"
+                         . "To set up your gaming wallet:\n"
+                         . "👉 *What is your first name or nickname?*";
+                $gateway->sendTextMessage($phone, $welcome, $tenant->whatsapp_number);
+                return;
+            }
+
+            $this->showRootMenu($gateway, $tenant, $phone, $sessionKey, $player);
             return;
+        }
+
+        // If player has no name but immediately sends a command/number, set default name
+        if (empty($player->name)) {
+            $player->update(['name' => 'Player ' . substr($phone, -4)]);
         }
 
         // Fast-path shortcuts (BAL, RES, KENO QP 200 1234, etc.)
@@ -89,7 +146,7 @@ class LottoConversationEngine
     /**
      * Display the Root USSD Menu (Item ID: 112).
      */
-    protected function showRootMenu(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, string $sessionKey): void
+    protected function showRootMenu(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, string $sessionKey, ?Player $player = null): void
     {
         $menu = UssdMenu::where('tenant_id', $tenant->id)->where('is_active', true)->first();
         $rootItem = $menu?->rootItem();
@@ -105,7 +162,11 @@ class LottoConversationEngine
             'data' => [],
         ], now()->addMinutes(15));
 
-        $gateway->sendTextMessage($phone, "🎰 *{$tenant->name}*\n━━━━━━━━━━━━━━━━\n" . $rootItem->response_text, $tenant->whatsapp_number);
+        $greeting = $player && !empty($player->name)
+            ? "🎰 *Welcome back, {$player->name}!* 🌟\n━━━━━━━━━━━━━━━━\n"
+            : "🎰 *{$tenant->name}*\n━━━━━━━━━━━━━━━━\n";
+
+        $gateway->sendTextMessage($phone, $greeting . $rootItem->response_text, $tenant->whatsapp_number);
     }
 
     /**
