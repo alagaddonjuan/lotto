@@ -14,14 +14,21 @@ class BetTicket extends Model
     protected $fillable = [
         'tenant_id',
         'player_id',
+        'game_draw_id',
         'ticket_reference',
         'operator_ticket_id',
         'game_code',
         'selected_numbers',
+        'wallet_source',
+        'stake_kobo',
+        'q4i_commission_kobo',
+        'operator_pool_kobo',
+        'payout_kobo',
         'stake_amount',
         'q4i_share',
         'operator_share',
         'status',
+        'lifecycle_status',
         'payout_amount',
         'idempotency_key',
         'hash',
@@ -30,6 +37,10 @@ class BetTicket extends Model
 
     protected $casts = [
         'selected_numbers' => 'array',
+        'stake_kobo' => 'integer',
+        'q4i_commission_kobo' => 'integer',
+        'operator_pool_kobo' => 'integer',
+        'payout_kobo' => 'integer',
         'stake_amount' => 'float',
         'q4i_share' => 'float',
         'operator_share' => 'float',
@@ -45,6 +56,11 @@ class BetTicket extends Model
     public function player(): BelongsTo
     {
         return $this->belongsTo(Player::class);
+    }
+
+    public function gameDraw(): BelongsTo
+    {
+        return $this->belongsTo(GameDraw::class);
     }
 
     public function ledgerEntries(): HasMany

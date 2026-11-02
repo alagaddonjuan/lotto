@@ -46,10 +46,10 @@ class PlayerPortalController extends Controller
             ? BetTicket::where('player_id', $player->id)->latest()->take(10)->get()
             : collect();
 
-        $operator = $this->operatorManager->driver($tenant);
-        $walletBal = $player ? $operator->checkWalletBalance($player->phone)['balance'] : 0.00;
+        $walletBal = $player ? round($player->cash_balance_kobo / 100, 2) : 0.00;
+        $bonusBal = $player ? round($player->bonus_balance_kobo / 100, 2) : 0.00;
 
-        return view('portal.play', compact('tenant', 'player', 'recentTickets', 'walletBal', 'defaultPhone'));
+        return view('portal.play', compact('tenant', 'player', 'recentTickets', 'walletBal', 'bonusBal', 'defaultPhone'));
     }
 
     /**
@@ -73,25 +73,25 @@ class PlayerPortalController extends Controller
             ['tenant_id' => $tenant->id, 'phone' => $phone],
             [
                 'name' => $validated['name'],
-                'pin_hash' => bcrypt($validated['pin']),
-                'kyc_status' => 'BASIC',
+                'pin_hash' => \Illuminate\Support\Facades\Hash::make($validated['pin']),
+                'withdrawal_pin_hash' => \Illuminate\Support\Facades\Hash::make($validated['pin']),
+                'cash_balance_kobo' => 0,
+                'bonus_balance_kobo' => 50000, // 500 NGN promotional welcome trial
                 'last_active_at' => now(),
             ]
         );
 
         // Reset session state
-        Cache::forget("session:{$tenant->id}:{$phone}");
-
-        $operator = $this->operatorManager->driver($tenant);
-        $wallet = $operator->checkWalletBalance($phone);
+        Cache::forget("wa:session:{$phone}");
 
         return response()->json([
             'success' => true,
-            'message' => 'Account created successfully with ₦4,500.00 trial credit!',
+            'message' => 'Account created successfully with ₦500.00 promotional bonus! Real cash deposit required for clearinghouse settlement.',
             'player' => [
                 'name' => $player->name,
                 'phone' => $player->phone,
-                'balance' => $wallet['balance'],
+                'cash_balance' => number_format($player->cash_balance_kobo / 100, 2),
+                'bonus_balance' => number_format($player->bonus_balance_kobo / 100, 2),
             ],
         ]);
     }
@@ -127,8 +127,7 @@ class PlayerPortalController extends Controller
 
         // Retrieve player & updated balance
         $player = Player::where('tenant_id', $tenant->id)->where('phone', $phone)->first();
-        $operator = $this->operatorManager->driver($tenant);
-        $wallet = $player ? $operator->checkWalletBalance($phone) : ['balance' => 0];
+        $cashBal = $player ? number_format($player->cash_balance_kobo / 100, 2) : '0.00';
 
         $latestTickets = $player
             ? BetTicket::where('player_id', $player->id)->latest()->take(5)->get()
@@ -137,15 +136,14 @@ class PlayerPortalController extends Controller
         // Check if there was a cached reply stored
         $reply = Cache::get("sim_reply:{$phone}", null);
         if (!$reply) {
-            // Provide intelligent fallback from session state
-            $session = Cache::get("session:{$tenant->id}:{$phone}", ['state' => 'USSD_MENU']);
-            $reply = "✅ Message received and processed for {$phone}. (Current State: {$session['state']})";
+            $session = Cache::get("wa:session:{$phone}", ['state' => 'ROOT_MENU']);
+            $reply = "✅ Message processed for {$phone}. (State: {$session['state']})";
         }
 
         return response()->json([
             'success' => true,
             'reply' => $reply,
-            'balance' => $wallet['balance'],
+            'balance' => $cashBal,
             'recentTickets' => $latestTickets,
         ]);
     }
@@ -163,26 +161,26 @@ class PlayerPortalController extends Controller
         $tenant = Tenant::first();
         $phone = preg_replace('/[^0-9]/', '', $validated['phone']);
 
-        $player = Player::where('tenant_id', $tenant->id)->where('phone', $phone)->first();
-        if (! $player) {
-            $player = Player::create([
-                'tenant_id' => $tenant->id,
-                'phone' => $phone,
-                'name' => 'Player ' . substr($phone, -4),
-                'pin_hash' => bcrypt('1234'),
-                'last_active_at' => now(),
-            ]);
-        }
+        $amountKobo = (int) round(((float) $validated['amount']) * 100);
 
-        // Add ledger entry and credit wallet
-        $operator = $this->operatorManager->driver($tenant);
-        $operator->creditWallet($phone, (float) $validated['amount'], 'WEB_SIM_DEPOSIT_' . Str::random(8));
-        $wallet = $operator->checkWalletBalance($phone);
+        $player = Player::firstOrCreate(
+            ['tenant_id' => $tenant->id, 'phone' => $phone],
+            [
+                'name' => 'Player ' . substr($phone, -4),
+                'cash_balance_kobo' => 0,
+                'bonus_balance_kobo' => 0,
+                'last_active_at' => now(),
+            ]
+        );
+
+        $player->cash_balance_kobo += $amountKobo;
+        $player->last_active_at = now();
+        $player->save();
 
         return response()->json([
             'success' => true,
-            'message' => "₦" . number_format($validated['amount'], 2) . " credited to wallet successfully!",
-            'balance' => $wallet['balance'],
+            'message' => "₦" . number_format($validated['amount'], 2) . " credited to real cash wallet successfully!",
+            'balance' => number_format($player->cash_balance_kobo / 100, 2),
         ]);
     }
 }

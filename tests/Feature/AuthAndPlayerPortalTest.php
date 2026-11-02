@@ -28,24 +28,41 @@ class AuthAndPlayerPortalTest extends TestCase
         $this->tenant = Tenant::first();
     }
 
-    public function test_new_operator_rep_can_register(): void
+    public function test_new_operator_rep_can_register_via_signed_invitation(): void
     {
-        $response = $this->post('/register', [
-            'name' => 'John Operator',
+        $admin = User::where('email', 'admin@q4iltd.com')->first();
+
+        $this->actingAs($admin);
+
+        // Issue invitation
+        $inviteRes = $this->post('/dashboard/invitations', [
             'email' => 'john@operator.ng',
-            'phone' => '+2348039999999',
-            'tenant_id' => $this->tenant->id,
             'role' => 'operator_rep',
-            'password' => 'secret12345',
-            'password_confirmation' => 'secret12345',
-            'enable_2fa' => 1,
+            'tenant_id' => $this->tenant->id,
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $inviteRes->assertSessionHas('invitation_url');
+        $signedUrl = session('invitation_url');
+
+        $this->assertDatabaseHas('operator_invitations', [
+            'email' => 'john@operator.ng',
+            'role' => 'operator_rep',
+            'tenant_id' => $this->tenant->id,
+        ]);
+
+        // Accept invitation via signed URL
+        $acceptRes = $this->post($signedUrl, [
+            'name' => 'John Operator',
+            'password' => 'secret12345',
+            'password_confirmation' => 'secret12345',
+        ]);
+
+        $acceptRes->assertRedirect('/two-factor-setup');
+
         $this->assertDatabaseHas('users', [
             'email' => 'john@operator.ng',
             'role' => 'operator_rep',
-            'two_factor_enabled' => 1,
+            'tenant_id' => $this->tenant->id,
         ]);
     }
 
@@ -108,14 +125,13 @@ class AuthAndPlayerPortalTest extends TestCase
 
         $resetResponse->assertRedirect('/login');
 
-        // Test login with new password
+        // Test login with new password (triggers 2FA challenge for 2FA-secured admin)
         $loginResponse = $this->post('/login', [
             'email' => 'admin@q4iltd.com',
             'password' => 'newpassword123',
         ]);
 
-        $loginResponse->assertRedirect('/dashboard');
-        $this->assertAuthenticatedAs($user);
+        $loginResponse->assertRedirect('/two-factor-challenge');
     }
 
     public function test_player_portal_renders_kiosk(): void
@@ -172,8 +188,12 @@ class AuthAndPlayerPortalTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJson([
-            'status' => 'success',
-            'amount' => 5000.00,
+            'status' => 'accepted',
+            'amount_kobo' => 500000,
         ]);
+
+        $player = Player::where('phone', '2348039876543')->first();
+        $this->assertNotNull($player);
+        $this->assertEquals(500000, $player->cash_balance_kobo);
     }
 }

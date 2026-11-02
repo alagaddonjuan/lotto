@@ -141,6 +141,58 @@ class AuthController extends Controller
     }
 
     /**
+     * Show Mandatory 2FA Setup Screen.
+     */
+    public function showSetupTwoFactor(): View|RedirectResponse
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        if ($user->two_factor_enabled) {
+            return redirect()->route('dashboard');
+        }
+
+        // Generate activation verification code
+        if (! $user->two_factor_code || ! $user->two_factor_expires_at || $user->two_factor_expires_at->isPast()) {
+            $user->generateTwoFactorCode();
+            Log::info("[2FA Setup] Mandatory 2FA activation code issued for {$user->email}");
+        }
+
+        return view('auth.two-factor-setup', [
+            'user' => $user,
+        ]);
+    }
+
+    /**
+     * Enable Mandatory 2FA after verifying code.
+     */
+    public function enableTwoFactor(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'code' => ['required', 'string', 'min:6', 'max:6'],
+        ]);
+
+        $user = Auth::user();
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        if (! $user->verifyTwoFactorCode($request->code)) {
+            return back()->withErrors(['code' => 'The verification code is incorrect or expired. Please check your inbox or resend code.']);
+        }
+
+        $user->forceFill([
+            'two_factor_enabled' => true,
+        ])->save();
+
+        Log::info("[2FA Security] Mandatory 2FA successfully configured and activated for {$user->email}");
+
+        return redirect()->route('dashboard')->with('success', 'Two-Factor Authentication configured and verified! Welcome to the Clearinghouse.');
+    }
+
+    /**
      * Display registration view for new operator reps and staff.
      */
     public function showRegister(): View|RedirectResponse

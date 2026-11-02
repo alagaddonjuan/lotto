@@ -76,6 +76,18 @@ class DashboardController extends Controller
         // Active Lotto Games for this operator
         $games = LottoGame::where('tenant_id', $tenant->id)->get();
 
+        // Active Draws & Operations Monitor
+        $activeDraws = \App\Models\GameDraw::where('tenant_id', $tenant->id)
+            ->with(['lottoGame', 'enteredBy', 'approvedBy'])
+            ->whereIn('status', [\App\Models\GameDraw::STATUS_OPEN, \App\Models\GameDraw::STATUS_LOCKED, \App\Models\GameDraw::STATUS_RESULT_PENDING])
+            ->orderBy('closes_at')
+            ->get();
+
+        $pendingMakerChecker = \App\Models\GameDraw::where('tenant_id', $tenant->id)
+            ->where('status', \App\Models\GameDraw::STATUS_RESULT_PENDING)
+            ->with(['lottoGame', 'enteredBy'])
+            ->get();
+
         $currentTab = $request->query('tab', 'overview');
 
         return view('dashboard.index', compact(
@@ -91,6 +103,8 @@ class DashboardController extends Controller
             'recentPlayers',
             'tenantReps',
             'games',
+            'activeDraws',
+            'pendingMakerChecker',
             'user',
             'currentTab'
         ));

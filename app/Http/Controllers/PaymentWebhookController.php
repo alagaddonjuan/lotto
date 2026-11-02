@@ -2,47 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Player;
+use App\Jobs\ProcessPaymentWebhookJob;
 use App\Models\Tenant;
-use App\Services\Ledger\LedgerService;
-use App\Services\Operators\OperatorManager;
-use App\Services\WhatsApp\WhatsAppManager;
+use App\Models\WebhookEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class PaymentWebhookController extends Controller
 {
-    public function __construct(
-        protected LedgerService $ledgerService,
-        protected OperatorManager $operatorManager,
-        protected WhatsAppManager $whatsAppManager
-    ) {}
-
     /**
      * Handle incoming payment notification webhook (Paystack, Flutterwave, Monnify DVA).
+     * Enforces database-level idempotency on (provider, external_reference) and Kobo math.
      */
     public function handle(Request $request): JsonResponse
     {
         Log::info('[PaymentWebhook] Ingress payload received', $request->all());
 
-        $event = $request->input('event') ?? $request->input('event_type') ?? 'charge.success';
+        $provider = strtolower($request->header('X-Payment-Provider', 'paystack'));
+        if ($request->has('event_type') || $request->has('responseCode')) {
+            $provider = 'monnify';
+        } elseif ($request->has('event') && str_contains($request->input('event'), 'charge.completed')) {
+            $provider = 'flutterwave';
+        }
 
         // Extract payment metadata
         $data = $request->input('data', $request->all());
-        $reference = $data['reference'] ?? $data['tx_ref'] ?? 'TXN_' . uniqid();
+        $reference = (string) ($data['reference'] ?? $data['tx_ref'] ?? $data['transactionReference'] ?? ('TXN_' . uniqid()));
         $rawAmount = $data['amount'] ?? 0;
-        
-        // Most gateways report in minor units (kobo/cents)
-        $amount = is_numeric($rawAmount) && $rawAmount > 1000 ? $rawAmount / 100 : (float)$rawAmount;
-        if ($amount <= 0) {
-            $amount = 1000.00; // fallback default
+
+        // Convert to integer Kobo
+        // Paystack & Monnify provide minor unit (Kobo) for values >= 1000; if float/decimal, convert to kobo
+        $amountKobo = is_numeric($rawAmount) && $rawAmount >= 10000
+            ? (int) $rawAmount
+            : (int) round(((float) $rawAmount) * 100);
+
+        if ($amountKobo <= 0) {
+            $amountKobo = 100000; // 1,000 NGN fallback
         }
 
         // Phone resolution from customer object or metadata
-        $customerPhone = $data['customer']['phone'] 
-            ?? $data['customer']['phone_number'] 
-            ?? $data['metadata']['phone'] 
+        $customerPhone = $data['customer']['phone']
+            ?? $data['customer']['phone_number']
+            ?? $data['metadata']['phone']
+            ?? $request->input('phone')
             ?? null;
 
         if (!$customerPhone) {
@@ -61,45 +64,37 @@ class PaymentWebhookController extends Controller
             return response()->json(['status' => 'tenant_not_found'], 404);
         }
 
-        // Find or create player
-        $player = Player::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'phone' => $cleanPhone],
-            [
-                'name' => $data['customer']['first_name'] ?? 'Player ' . substr($cleanPhone, -4),
-                'pin_hash' => bcrypt('1234'),
-                'last_active_at' => now(),
-            ]
+        // Immediate database idempotency pre-check
+        $alreadyProcessed = WebhookEvent::where('provider', $provider)
+            ->where('external_reference', $reference)
+            ->whereNotNull('processed_at')
+            ->exists();
+
+        if ($alreadyProcessed) {
+            return response()->json(['status' => 'already_processed', 'reference' => $reference], 200);
+        }
+
+        $job = new ProcessPaymentWebhookJob(
+            provider: $provider,
+            reference: $reference,
+            amountKobo: $amountKobo,
+            phone: $cleanPhone,
+            payload: $request->all(),
+            tenantId: $tenant->id
         );
 
-        // Credit operator wallet
-        $operator = $this->operatorManager->driver($tenant);
-        $operator->creditWallet($cleanPhone, $amount, $reference);
-        $wallet = $operator->checkWalletBalance($cleanPhone);
-        $newBal = number_format($wallet['balance'], 2);
-
-        // Send instant WhatsApp receipt to player
-        try {
-            $gateway = $this->whatsAppManager->driver($tenant);
-            $receiptMsg = "✅ *Deposit Confirmed!*\n"
-                . "━━━━━━━━━━━━━━━━\n"
-                . "💰 Amount: *{$tenant->currency} " . number_format($amount, 2) . "*\n"
-                . "💳 Ref: *{$reference}*\n"
-                . "💼 New Balance: *{$tenant->currency} {$newBal}*\n"
-                . "━━━━━━━━━━━━━━━━\n\n"
-                . "Your wallet is funded! Reply *1* to view today's lotto games. 🍀";
-
-            $gateway->sendTextMessage($cleanPhone, $receiptMsg, $tenant->whatsapp_number);
-        } catch (\Throwable $e) {
-            Log::error('[PaymentWebhook] Failed to dispatch WhatsApp receipt', ['error' => $e->getMessage()]);
+        if (config('queue.default') === 'sync') {
+            dispatch_sync($job);
+        } else {
+            dispatch($job)->onQueue('webhooks-payment');
         }
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Wallet credited successfully',
+            'status' => 'accepted',
+            'provider' => $provider,
+            'reference' => $reference,
             'phone' => $cleanPhone,
-            'amount' => $amount,
-            'balance' => $wallet['balance'],
+            'amount_kobo' => $amountKobo,
         ], 200);
     }
 }
-

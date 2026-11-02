@@ -84,12 +84,9 @@
                 </button>
             </form>
 
-            <!-- Registration Link -->
-            <div class="mt-8 pt-6 border-t border-slate-800 text-center text-xs text-slate-400">
-                New operator representative or manager?
-                <a href="{{ route('register') }}" class="text-emerald-400 hover:text-emerald-300 font-bold ml-1 transition">
-                    Register Operator Account &rarr;
-                </a>
+            <!-- Institutional Access Notice -->
+            <div class="mt-8 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
+                <span>Access restricted to authorized personnel. New operators must receive a cryptographic invitation from an executive clearinghouse administrator.</span>
             </div>
         </div>
 

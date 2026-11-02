@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/webhook/*',
             'webhook/*',
         ]);
+
+        $middleware->alias([
+            'two-factor.mandatory' => \App\Http\Middleware\EnsureTwoFactorEnabled::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

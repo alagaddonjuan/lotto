@@ -52,5 +52,15 @@ class Tenant extends Model
     {
         return $this->hasMany(LedgerEntry::class);
     }
+
+    public function gameDraws(): HasMany
+    {
+        return $this->hasMany(GameDraw::class);
+    }
+
+    public function operatorInvitations(): HasMany
+    {
+        return $this->hasMany(OperatorInvitation::class);
+    }
 }
 

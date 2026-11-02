@@ -17,13 +17,24 @@ Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-Route::post('/register', [AuthController::class, 'register'])->name('register.post');
+// Open Self-Registration is strictly disabled in institutional mode
+// Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
+// Route::post('/register', [AuthController::class, 'register'])->name('register.post');
 
-// Two-Factor Authentication (2FA) Challenge
+// Two-Factor Authentication (2FA) Challenge (Login)
 Route::get('/two-factor-challenge', [AuthController::class, 'showTwoFactorChallenge'])->name('two-factor.challenge');
 Route::post('/two-factor-challenge', [AuthController::class, 'verifyTwoFactor'])->name('two-factor.verify');
 Route::post('/two-factor-challenge/resend', [AuthController::class, 'resendTwoFactor'])->name('two-factor.resend');
+
+// Mandatory 2FA Configuration (Required for All Staff)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/two-factor-setup', [AuthController::class, 'showSetupTwoFactor'])->name('two-factor.setup');
+    Route::post('/two-factor-setup', [AuthController::class, 'enableTwoFactor'])->name('two-factor.setup.post');
+});
+
+// Signed Staff Invitation Routes
+Route::get('/invitations/accept/{token}', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'showAcceptForm'])->name('invitations.accept');
+Route::post('/invitations/accept/{token}', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'accept'])->name('invitations.accept.post');
 
 // Password Reset Flow
 Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
@@ -31,11 +42,15 @@ Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name(
 Route::get('/reset-password/{token}', [AuthController::class, 'showResetPassword'])->name('password.reset');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 
-// Protected Dashboard Routes
-Route::middleware(['auth'])->group(function () {
+// Protected Clearinghouse Dashboard Routes (Auth + Mandatory 2FA)
+Route::middleware(['auth', 'two-factor.mandatory'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/api/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
+
+    // Operator Staff Cryptographic Invitations
+    Route::post('/dashboard/invitations', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'invite'])->name('dashboard.invitations.create');
+    Route::post('/dashboard/invite-rep', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'invite'])->name('dashboard.invite-rep');
 
     // Simulation & Live Testing APIs
     Route::post('/api/dashboard/simulate-bet', [DashboardController::class, 'simulateBet'])->name('dashboard.simulate-bet');
@@ -44,7 +59,12 @@ Route::middleware(['auth'])->group(function () {
 
     // Management Actions
     Route::post('/dashboard/create-tenant', [DashboardController::class, 'createTenant'])->name('dashboard.create-tenant');
-    Route::post('/dashboard/invite-rep', [DashboardController::class, 'inviteRep'])->name('dashboard.invite-rep');
+
+    // Draw Lifecycle & Maker-Checker Operations
+    Route::get('/dashboard/draws', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'index'])->name('dashboard.draws.index');
+    Route::post('/dashboard/draws', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'store'])->name('dashboard.draws.store');
+    Route::post('/dashboard/draws/{draw}/enter-results', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'enterResults'])->name('dashboard.draws.enter-results');
+    Route::post('/dashboard/draws/{draw}/approve-results', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'approveResults'])->name('dashboard.draws.approve-results');
 
     // Settlement & Reconciliation Invoicing
     Route::get('/dashboard/export-settlement-csv', [SettlementStatementController::class, 'exportCsv'])->name('dashboard.export-csv');

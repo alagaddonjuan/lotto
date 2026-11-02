@@ -35,6 +35,21 @@ class SettlementService
         // 3. Gross Gaming Revenue (GGR) = Stakes - Winnings
         $ggr = max(0, $totalStakes - $totalWinnings);
 
+        // 3b. Open Draw Liability vs Settled Revenue
+        $openTicketsQuery = BetTicket::where('tenant_id', $tenant->id)
+            ->where('lifecycle_status', 'OPEN')
+            ->whereBetween('created_at', [$startDate, $endDate]);
+
+        $openDrawLiabilityKobo = (int) (clone $openTicketsQuery)->sum('stake_kobo');
+        $openTicketsCount = (clone $openTicketsQuery)->count();
+
+        $settledTicketsQuery = BetTicket::where('tenant_id', $tenant->id)
+            ->whereIn('lifecycle_status', ['WON', 'LOST'])
+            ->whereBetween('created_at', [$startDate, $endDate]);
+
+        $settledRevenueKobo = (int) (clone $settledTicketsQuery)->sum('stake_kobo');
+        $settledTicketsCount = (clone $settledTicketsQuery)->count();
+
         // 4. Split Calculation
         // Based on agreed terms: 35% Q4I Limited / 65% Operator
         $q4iShare = round(($totalStakes * $tenant->q4i_split_percent) / 100, 2);
@@ -75,6 +90,10 @@ class SettlementService
                 'total_tickets' => $totalTickets,
                 'total_winnings_paid' => $totalWinnings,
                 'gross_gaming_revenue' => $ggr,
+                'open_draw_liability' => round($openDrawLiabilityKobo / 100, 2),
+                'open_tickets_count' => $openTicketsCount,
+                'settled_revenue' => round($settledRevenueKobo / 100, 2),
+                'settled_tickets_count' => $settledTicketsCount,
             ],
             'splits' => [
                 'q4i_percentage' => $tenant->q4i_split_percent,

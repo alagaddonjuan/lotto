@@ -34,5 +34,10 @@ class LottoGame extends Model
     {
         return $this->belongsTo(Tenant::class);
     }
+
+    public function gameDraws(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(GameDraw::class);
+    }
 }
 

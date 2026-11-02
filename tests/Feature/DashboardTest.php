@@ -44,8 +44,7 @@ class DashboardTest extends TestCase
             'password' => 'admin123456',
         ]);
 
-        $response->assertRedirect('/dashboard');
-        $this->assertAuthenticatedAs($this->adminUser);
+        $response->assertRedirect('/two-factor-challenge');
     }
 
     public function test_dashboard_renders_successfully_for_authenticated_admin(): void
@@ -54,8 +53,9 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Q4I Financial Engine');
         $response->assertSee('Registered Players');
-        $response->assertSee('Live Transactions Ledger');
-        $response->assertSee('Operator Reps');
+        $response->assertSee('Transactions');
+        $response->assertSee('Hash Seals');
+        $response->assertSee('Staff Invitations');
     }
 
     public function test_dashboard_stats_api_returns_accurate_splits(): void

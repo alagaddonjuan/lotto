@@ -21,6 +21,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('admin123456'),
                 'role' => 'super_admin',
                 'tenant_id' => null,
+                'two_factor_enabled' => true,
             ]
         );
 
@@ -33,6 +34,7 @@ class UserSeeder extends Seeder
                     'password' => Hash::make('rep123456'),
                     'role' => 'operator_rep',
                     'tenant_id' => $tenant->id,
+                    'two_factor_enabled' => true,
                 ]
             );
         }

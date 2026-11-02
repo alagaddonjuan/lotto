@@ -22,7 +22,9 @@ class ProcessWhatsAppWebhookJob implements ShouldQueue
     public function __construct(
         public Tenant $tenant,
         public IncomingMessageDTO $messageDto
-    ) {}
+    ) {
+        $this->onQueue('whatsapp-outbound');
+    }
 
     /**
      * Execute the job.

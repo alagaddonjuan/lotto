@@ -66,12 +66,6 @@ class User extends Authenticatable
      */
     public function verifyTwoFactorCode(string $code): bool
     {
-        // Demo/Emergency master code for sandbox testing
-        if ($code === '123456' && app()->environment('local', 'testing')) {
-            $this->resetTwoFactorCode();
-            return true;
-        }
-
         if (
             $this->two_factor_code &&
             $this->two_factor_code === $code &&

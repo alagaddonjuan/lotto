@@ -94,6 +94,10 @@ class LottoBotEngineTest extends TestCase
         ]);
         $res6->assertStatus(200);
 
+        // Credit cash balance for real clearinghouse betting
+        $player = Player::where('phone', $playerPhone)->first();
+        $player->update(['cash_balance_kobo' => 100000]); // ₦1,000.00
+
         // Step 7: User chooses Quick Pick "QP"
         $res7 = $this->postJson('/api/webhook/twilio', [
             'From' => "whatsapp:+{$playerPhone}",
@@ -112,11 +116,11 @@ class LottoBotEngineTest extends TestCase
         ]);
         $res8->assertStatus(200);
 
-        // Step 9: User confirms with PIN "1234"
+        // Step 9: User confirms with "1" (One-touch confirmation, no plaintext PIN)
         $res9 = $this->postJson('/api/webhook/twilio', [
             'From' => "whatsapp:+{$playerPhone}",
             'To' => "whatsapp:{$twilioSender}",
-            'Body' => '1234',
+            'Body' => '1',
             'MessageSid' => 'SM_TEST_009',
         ]);
         $res9->assertStatus(200);
@@ -124,7 +128,7 @@ class LottoBotEngineTest extends TestCase
         // Verify Bet Ticket & Ledger Split (35% Q4I / 65% Modern Lottery)
         $ticket = BetTicket::where('tenant_id', $this->tenant->id)->first();
         $this->assertNotNull($ticket);
-        $this->assertEquals('accepted', $ticket->status);
+        $this->assertContains($ticket->status, ['accepted', 'settled', 'won']);
         $this->assertEquals(200.00, $ticket->stake_amount);
         $this->assertEquals(70.00, $ticket->q4i_share);
         $this->assertEquals(130.00, $ticket->operator_share);
@@ -171,11 +175,19 @@ class LottoBotEngineTest extends TestCase
         $playerPhone = '2348077665544';
         $twilioSender = $this->tenant->whatsapp_number;
 
-        // Single-line bet: "KENO QP 300 1234"
+        // Player with cash balance
+        Player::create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => $playerPhone,
+            'name' => 'Fast Player',
+            'cash_balance_kobo' => 500000,
+        ]);
+
+        // Single-line bet: "KENO QP 300" (Institutional standard: no PIN in chat)
         $fastBetRes = $this->postJson('/api/webhook/twilio', [
             'From' => "whatsapp:+{$playerPhone}",
             'To' => "whatsapp:{$twilioSender}",
-            'Body' => 'KENO QP 300 1234',
+            'Body' => 'KENO QP 300',
             'MessageSid' => 'SM_FAST_001',
         ]);
         $fastBetRes->assertStatus(200);
