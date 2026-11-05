@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\Player;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\TwoFactorCodeNotification;
 use Database\Seeders\ModernLotterySeeder;
 use Database\Seeders\ModernLotteryUssdMenuSeeder;
 use Database\Seeders\UserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class AuthAndPlayerPortalTest extends TestCase
@@ -195,5 +197,62 @@ class AuthAndPlayerPortalTest extends TestCase
         $player = Player::where('phone', '2348039876543')->first();
         $this->assertNotNull($player);
         $this->assertEquals(500000, $player->cash_balance_kobo);
+    }
+
+    public function test_two_factor_notification_is_dispatched_and_previewable_in_test_mode(): void
+    {
+        Notification::fake();
+
+        $user = User::create([
+            'name' => 'OTP Test User',
+            'email' => 'otp-test@q4iltd.com',
+            'password' => Hash::make('password123'),
+            'role' => 'operator_rep',
+            'two_factor_enabled' => true,
+        ]);
+
+        $res = $this->post('/login', [
+            'email' => 'otp-test@q4iltd.com',
+            'password' => 'password123',
+        ]);
+
+        $res->assertRedirect('/two-factor-challenge');
+
+        // Verify the notification was dispatched
+        Notification::assertSentTo(
+            $user,
+            TwoFactorCodeNotification::class,
+            function (TwoFactorCodeNotification $notification) use ($user) {
+                return $notification->code === $user->fresh()->two_factor_code;
+            }
+        );
+
+        // Challenge screen renders and in testing/log mode includes the active code preview
+        $challengeRes = $this->withSession([
+            'auth.2fa.id' => $user->id,
+        ])->get('/two-factor-challenge');
+
+        $challengeRes->assertStatus(200);
+        $challengeRes->assertSee($user->fresh()->two_factor_code);
+        $challengeRes->assertSee('Quick Fill & Login', false);
+    }
+
+    public function test_auth_manage_artisan_command(): void
+    {
+        $this->artisan('auth:user')
+            ->expectsOutputToContain('Q4I Clearinghouse Operator Directory')
+            ->assertSuccessful();
+
+        $this->artisan('auth:user admin@q4iltd.com --disable-2fa')
+            ->expectsOutputToContain('2FA has been DISABLED')
+            ->assertSuccessful();
+
+        $this->assertFalse(User::where('email', 'admin@q4iltd.com')->value('two_factor_enabled'));
+
+        $this->artisan('auth:user admin@q4iltd.com --enable-2fa')
+            ->expectsOutputToContain('2FA has been ENABLED')
+            ->assertSuccessful();
+
+        $this->assertTrue(User::where('email', 'admin@q4iltd.com')->value('two_factor_enabled'));
     }
 }

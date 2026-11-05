@@ -44,7 +44,29 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('two-factor.verify') }}" class="space-y-6">
+            @if (!empty($codePreview))
+                <div class="mb-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-center space-y-2">
+                    <div class="flex items-center justify-center gap-1.5 font-bold text-amber-400">
+                        <i class="fa-solid fa-server"></i>
+                        <span>Local / Staging Environment Notice</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300">
+                        Outbound mail is in <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">log</code> mode (no live SMTP credentials in .env).
+                    </p>
+                    <div class="flex items-center justify-center gap-2 pt-1">
+                        <span class="font-mono text-base font-bold tracking-widest text-emerald-400 bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">
+                            {{ $codePreview }}
+                        </span>
+                        <button type="button" onclick="document.getElementById('code').value='{{ $codePreview }}'; document.getElementById('two-factor-form').submit();"
+                            class="text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 px-3 py-1.5 rounded-lg border border-emerald-500/30 transition flex items-center gap-1">
+                            <i class="fa-solid fa-bolt"></i>
+                            <span>Quick Fill & Login</span>
+                        </button>
+                    </div>
+                </div>
+            @endif
+
+            <form id="two-factor-form" method="POST" action="{{ route('two-factor.verify') }}" class="space-y-6">
                 @csrf
 
                 <div>

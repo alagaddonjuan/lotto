@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\OperatorInvitation;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\OperatorInvitationNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -61,6 +63,13 @@ class OperatorInviteController extends Controller
             $expiresAt,
             ['token' => $token]
         );
+
+        try {
+            Notification::route('mail', $invitation->email)
+                ->notify(new OperatorInvitationNotification($invitation, $signedUrl));
+        } catch (\Throwable $e) {
+            Log::warning("[Security] Operator invite email failed for {$invitation->email}: " . $e->getMessage());
+        }
 
         Log::info("[Security] Operator invitation generated for {$validated['email']} (Tenant: {$tenantId})");
 

@@ -22,3 +22,4 @@ return [
     'fund_info' => "💳 *How To Add Money Sharp-Sharp*\n━━━━━━━━━━━━━━━━\nTransfer direct go your own Virtual Bank Account:\n🏦 Bank: *Wema Bank / Monnify*\n🔢 Account No: *:account*\n👤 Name: *:tenant - :name*\n━━━━━━━━━━━━━━━━\nAs you transfer, e go enter your balance immediately!",
     'lang_selected' => "✅ You don set your language to *Nigerian Pidgin*.",
 ];
+

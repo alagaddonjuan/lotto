@@ -22,3 +22,4 @@ return [
     'fund_info' => "💳 *Tinye Ego n'Akaụntụ Gị Ozugbo*\n━━━━━━━━━━━━━━━━\nNyefee ego ozugbo na Akaụntụ Pụrụ Iche gị:\n🏦 Ụlọ Akụ: *Wema Bank / Monnify*\n🔢 Nọmba Akaụntụ: *:account*\n👤 Aha: *:tenant - :name*\n━━━━━━━━━━━━━━━━\nEgo gị ga-apụta n'ime sekọnd ole na ole!",
     'lang_selected' => "✅ Agbanweela asụsụ gị gaa na *Igbo*.",
 ];
+

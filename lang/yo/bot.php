@@ -22,3 +22,4 @@ return [
     'fund_info' => "💳 *Fi Owó Sí Àkántì Rẹ Lẹ́sẹ̀kẹsẹ̀*\n━━━━━━━━━━━━━━━━\nFi owó ránṣẹ́ sí nọ́mbà àkántì rẹ lẹ́sẹ̀kẹsẹ̀:\n🏦 Ilé Ìfowópamọ́: *Wema Bank / Monnify*\n🔢 Nọ́mbà Àkántì: *:account*\n👤 Orúkọ: *:tenant - :name*\n━━━━━━━━━━━━━━━━\nOwó rẹ yóò hàn láàrin àkókò díẹ̀!",
     'lang_selected' => "✅ Èdè rẹ ti yí padà sí *Yorùbá*.",
 ];
+

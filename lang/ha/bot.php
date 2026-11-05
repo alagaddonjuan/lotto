@@ -22,3 +22,4 @@ return [
     'fund_info' => "💳 *Sanya Kuɗi Cikin Sauƙi*\n━━━━━━━━━━━━━━━━\nTurowa kai tsaye zuwa Asusun Banki na Musamman:\n🏦 Banki: *Wema Bank / Monnify*\n🔢 Lambar Asusu: *:account*\n👤 Sunan Asusu: *:tenant - :name*\n━━━━━━━━━━━━━━━━\nKuɗinka zai bayyana a cikin ƴan daƙiƙa!",
     'lang_selected' => "✅ An sauya harshenka zuwa *Hausa*.",
 ];
+

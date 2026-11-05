@@ -22,3 +22,4 @@ return [
     'fund_info' => "💳 *Fund Your Wallet Instantly*\n━━━━━━━━━━━━━━━━\nTransfer directly to your Dedicated Virtual Account:\n🏦 Bank: *Wema Bank / Monnify*\n🔢 Account No: *:account*\n👤 Beneficiary: *:tenant - :name*\n━━━━━━━━━━━━━━━━\nDeposits reflect in your balance in seconds!",
     'lang_selected' => "✅ Language set to *English*.",
 ];
+
