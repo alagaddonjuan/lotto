@@ -18,25 +18,27 @@ class SettlementService
         $startDate = $startDate ?? now()->startOfMonth();
         $endDate = $endDate ?? now()->endOfMonth();
 
-        // 1. Turnover & Tickets
+        // 1. Turnover & Tickets (Cash tickets only; bonus promotional bets are segregated)
         $ticketQuery = BetTicket::where('tenant_id', $tenant->id)
-            ->where('status', 'accepted')
+            ->where('wallet_source', 'CASH')
+            ->whereIn('lifecycle_status', ['OPEN', 'WON', 'LOST'])
             ->whereBetween('created_at', [$startDate, $endDate]);
 
         $totalStakes = (float)(clone $ticketQuery)->sum('stake_amount');
         $totalTickets = (clone $ticketQuery)->count();
 
-        // 2. Winnings & Payouts
+        // 2. Winnings & Payouts (Real Cash payouts)
         $totalWinnings = (float)BetTicket::where('tenant_id', $tenant->id)
-            ->where('status', 'won')
+            ->where('lifecycle_status', 'WON')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->sum('payout_amount');
 
         // 3. Gross Gaming Revenue (GGR) = Stakes - Winnings
         $ggr = max(0, $totalStakes - $totalWinnings);
 
-        // 3b. Open Draw Liability vs Settled Revenue
+        // 3b. Open Draw Liability (Escrow) vs Settled Revenue
         $openTicketsQuery = BetTicket::where('tenant_id', $tenant->id)
+            ->where('wallet_source', 'CASH')
             ->where('lifecycle_status', 'OPEN')
             ->whereBetween('created_at', [$startDate, $endDate]);
 
@@ -44,16 +46,23 @@ class SettlementService
         $openTicketsCount = (clone $openTicketsQuery)->count();
 
         $settledTicketsQuery = BetTicket::where('tenant_id', $tenant->id)
+            ->where('wallet_source', 'CASH')
             ->whereIn('lifecycle_status', ['WON', 'LOST'])
             ->whereBetween('created_at', [$startDate, $endDate]);
 
         $settledRevenueKobo = (int) (clone $settledTicketsQuery)->sum('stake_kobo');
         $settledTicketsCount = (clone $settledTicketsQuery)->count();
 
-        // 4. Split Calculation
-        // Based on agreed terms: 35% Q4I Limited / 65% Operator
-        $q4iShare = round(($totalStakes * $tenant->q4i_split_percent) / 100, 2);
-        $operatorShare = round($totalStakes - $q4iShare, 2);
+        // 4. Safe Institutional Split Calculation
+        // Commercial split: 35% Q4I Limited / 65% Operator strictly on settled turnover!
+        // Unsettled stakes sit in Escrow until physical draw closes and is approved.
+        $settledSalesNgn = round($settledRevenueKobo / 100, 2);
+        $q4iShare = round(($settledSalesNgn * $tenant->q4i_split_percent) / 100, 2);
+        $operatorShare = round($settledSalesNgn - $q4iShare, 2);
+
+        $escrowTurnoverNgn = round($openDrawLiabilityKobo / 100, 2);
+        $q4iEscrowPending = round(($escrowTurnoverNgn * $tenant->q4i_split_percent) / 100, 2);
+        $operatorEscrowPending = round($escrowTurnoverNgn - $q4iEscrowPending, 2);
 
         // 5. Ledger Audit Validation
         $ledgerQ4ITotal = (float)LedgerEntry::where('tenant_id', $tenant->id)
@@ -98,11 +107,13 @@ class SettlementService
             'splits' => [
                 'q4i_percentage' => $tenant->q4i_split_percent,
                 'q4i_accrued_earned' => $q4iShare,
+                'q4i_escrow_pending' => $q4iEscrowPending,
                 'q4i_already_withdrawn' => $totalSettledQ4I,
                 'q4i_available_to_spend' => $availableToSpendQ4I,
 
                 'operator_percentage' => $tenant->operator_split_percent,
                 'operator_accrued_pool' => $operatorShare,
+                'operator_escrow_pending' => $operatorEscrowPending,
             ],
             'audit' => [
                 'ledger_reconciled' => $isReconciled,

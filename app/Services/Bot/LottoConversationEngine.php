@@ -63,18 +63,24 @@ class LottoConversationEngine
             return;
         }
 
+        $upperInput = strtoupper(trim($input));
+
+        // 3b. Language Selection Handling
+        if ($upperInput === 'LANG' || $upperInput === 'LANGUAGE' || $upperInput === 'EDE' || $upperInput === 'ASUSU' || $upperInput === 'HARSHEN' || str_starts_with($upperInput, 'LANG_') || str_starts_with($upperInput, 'LANG ')) {
+            $this->handleLanguageSwitch($upperInput, $gateway, $tenant, $player, $sessionKey);
+            return;
+        }
+
         // Newcomer Onboarding State Machine
         if ($session['state'] === 'ONBOARDING_NAME') {
             $name = ucwords(strtolower(trim($input)));
             if (strlen($name) < 2 || is_numeric($name)) {
-                $gateway->sendTextMessage($phone, "👋 Please reply with your first name or nickname (e.g. *Michael*):", $tenant->whatsapp_number);
+                $gateway->sendTextMessage($phone, $this->msg('invalid_name', [], $player->language), $tenant->whatsapp_number);
                 return;
             }
             $player->update(['name' => $name]);
             Cache::put($sessionKey, ['state' => 'ONBOARDING_PIN', 'data' => ['name' => $name]], now()->addMinutes(15));
-            $msg = "Awesome to have you, *{$name}*! 🎉\n\n"
-                 . "🔐 Choose a *4-digit Security Withdrawal PIN* to protect your bank payouts (e.g. *5829*):\n"
-                 . "_(You will never be asked for this PIN to place bets)_";
+            $msg = $this->msg('welcome_name', ['name' => $name], $player->language);
             $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
             return;
         }
@@ -82,7 +88,7 @@ class LottoConversationEngine
         if ($session['state'] === 'ONBOARDING_PIN') {
             $pin = trim($input);
             if (strlen($pin) !== 4 || !ctype_digit($pin)) {
-                $gateway->sendTextMessage($phone, "⚠️ Please enter a valid *4-digit numeric PIN* (e.g. *5829*):", $tenant->whatsapp_number);
+                $gateway->sendTextMessage($phone, $this->msg('invalid_pin', [], $player->language), $tenant->whatsapp_number);
                 return;
             }
 
@@ -95,14 +101,13 @@ class LottoConversationEngine
             $cashNgn = number_format($player->cash_balance_kobo / 100, 2);
             $bonusNgn = number_format($player->bonus_balance_kobo / 100, 2);
 
-            $msg = "✅ *Account Verified Successfully!*\n"
-                 . "━━━━━━━━━━━━━━━━\n"
-                 . "👤 Account: *{$player->name}*\n"
-                 . "📱 Phone: *+{$phone}*\n"
-                 . "💵 Cash Balance: *{$tenant->currency} {$cashNgn}*\n"
-                 . "🎁 Bonus Balance: *{$tenant->currency} {$bonusNgn}*\n"
-                 . "━━━━━━━━━━━━━━━━\n\n"
-                 . "You're all set! Use buttons below to play or fund your wallet:";
+            $msg = $this->msg('account_ready', [
+                'name' => $player->name,
+                'phone' => $phone,
+                'currency' => $tenant->currency,
+                'cash' => $cashNgn,
+                'bonus' => $bonusNgn,
+            ], $player->language);
             $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
 
             $this->showRootMenu($gateway, $tenant, $phone, $sessionKey, $player);
@@ -113,10 +118,10 @@ class LottoConversationEngine
         if (in_array(strtoupper($input), ['RESET', 'CANCEL', 'MENU', 'HOME', 'START', 'HI', 'HELLO', 'MAIN'])) {
             if (empty($player->name)) {
                 Cache::put($sessionKey, ['state' => 'ONBOARDING_NAME', 'data' => []], now()->addMinutes(15));
-                $welcome = "🎰 *Welcome to {$tenant->name}!* 👋\n"
-                         . "Nigeria's institutional lottery clearinghouse.\n\n"
-                         . "Instant payouts & audited daily draws in *Ghana 5/90* and *Keno 20/80*!\n\n"
-                         . "👉 *What is your first name or nickname?*";
+                $welcome = $this->msg('welcome_header', ['tenant' => $tenant->name], $player->language)
+                         . "\n\n"
+                         . $this->msg('ask_name', [], $player->language)
+                         . "\n\n_(Reply *LANG* anytime to switch to Pidgin, Yorùbá, Hausa, or Igbo)_";
                 $gateway->sendTextMessage($phone, $welcome, $tenant->whatsapp_number);
                 return;
             }
@@ -153,7 +158,11 @@ class LottoConversationEngine
             }
 
             // Direct numeric trigger (e.g. 1 for Play Games in USSD mode)
-            if (ctype_digit($input) && !empty($session['item_id'])) {
+            if (ctype_digit($input)) {
+                if (empty($session['item_id'])) {
+                    $menu = UssdMenu::where('tenant_id', $tenant->id)->where('is_active', true)->first();
+                    $session['item_id'] = $menu?->rootItem()?->id ?? 112;
+                }
                 $this->handleUssdMenuNavigation($input, $gateway, $tenant, $player, $operator, $session, $sessionKey);
                 return;
             }
@@ -188,6 +197,61 @@ class LottoConversationEngine
     }
 
     /**
+     * Localization helper reading from lang/{locale}/bot.php
+     */
+    protected function msg(string $key, array $replace = [], ?string $locale = 'en'): string
+    {
+        $locale = in_array($locale, ['en', 'pcm', 'yo', 'ha', 'ig']) ? $locale : 'en';
+        return __("bot.{$key}", $replace, $locale);
+    }
+
+    /**
+     * Handle Language Selection & Switching (Pidgin, Yorùbá, Hausa, Igbo, English).
+     */
+    protected function handleLanguageSwitch(string $input, WhatsAppGatewayInterface $gateway, Tenant $tenant, Player $player, string $sessionKey): void
+    {
+        $phone = $player->phone;
+        $matchedLang = null;
+
+        if (str_contains($input, 'PCM') || str_contains($input, 'PIDGIN')) {
+            $matchedLang = 'pcm';
+        } elseif (str_contains($input, 'YO') || str_contains($input, 'YORUBA')) {
+            $matchedLang = 'yo';
+        } elseif (str_contains($input, 'HA') || str_contains($input, 'HAUSA')) {
+            $matchedLang = 'ha';
+        } elseif (str_contains($input, 'IG') || str_contains($input, 'IGBO')) {
+            $matchedLang = 'ig';
+        } elseif (str_contains($input, 'EN') || str_contains($input, 'ENGLISH')) {
+            $matchedLang = 'en';
+        }
+
+        if ($matchedLang) {
+            $player->update(['language' => $matchedLang]);
+            $confirm = $this->msg('lang_selected', [], $matchedLang);
+            $gateway->sendTextMessage($phone, $confirm, $tenant->whatsapp_number);
+            $this->showRootMenu($gateway, $tenant, $phone, $sessionKey, $player);
+            return;
+        }
+
+        // Present language choices via interactive list menu
+        $sections = [
+            [
+                'title' => 'Select Your Language',
+                'rows' => [
+                    ['id' => 'LANG_EN', 'title' => '🇬🇧 English', 'description' => 'English Language'],
+                    ['id' => 'LANG_PCM', 'title' => '🇳🇬 Pidgin', 'description' => 'Naija Pidgin English'],
+                    ['id' => 'LANG_YO', 'title' => '🟡 Yorùbá', 'description' => 'Èdè Yorùbá'],
+                    ['id' => 'LANG_HA', 'title' => '🟢 Hausa', 'description' => 'Harshen Hausa'],
+                    ['id' => 'LANG_IG', 'title' => '🔴 Igbo', 'description' => 'Asụsụ Igbo'],
+                ],
+            ],
+        ];
+
+        $header = "🌐 *SELECT LANGUAGE / YAN ÈDÈ / ZAƁI HARSHE / HỌRỌ ASỤSỤ*\n\nChoose your preferred language for betting, receipts, and results:";
+        $gateway->sendListMenu($phone, $header, 'Choose Language', $sections, $tenant->whatsapp_number);
+    }
+
+    /**
      * Display Root Menu with Native 3-Button Interactive Prompt.
      */
     protected function showRootMenu(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, string $sessionKey, ?Player $player = null): void
@@ -201,20 +265,21 @@ class LottoConversationEngine
             'data' => [],
         ], now()->addMinutes(15));
 
+        $lang = $player?->language ?? 'en';
         $cashNgn = $player ? number_format($player->cash_balance_kobo / 100, 2) : '0.00';
         $name = $player?->name ?? 'Player';
 
-        $header = "🎰 *{$tenant->name} Clearinghouse*\n"
-                . "━━━━━━━━━━━━━━━━━━━━\n"
-                . "👤 Account: *{$name}*\n"
-                . "💰 Cash Balance: *{$tenant->currency} {$cashNgn}*\n"
-                . "━━━━━━━━━━━━━━━━━━━━\n"
-                . "Select an option below to proceed:";
+        $header = $this->msg('root_menu_header', [
+            'tenant' => $tenant->name,
+            'name' => $name,
+            'currency' => $tenant->currency,
+            'cash' => $cashNgn,
+        ], $lang);
 
         $buttons = [
-            ['id' => 'opt_play', 'title' => '🎯 Play Games'],
-            ['id' => 'opt_fund', 'title' => '💳 Fund Wallet'],
-            ['id' => 'opt_results', 'title' => '🏆 Check Results'],
+            ['id' => 'opt_play', 'title' => '🎯 ' . $this->msg('btn_play', [], $lang)],
+            ['id' => 'opt_fund', 'title' => '💳 ' . $this->msg('btn_fund', [], $lang)],
+            ['id' => 'opt_results', 'title' => '🏆 ' . $this->msg('btn_results', [], $lang)],
         ];
 
         $gateway->sendQuickReplyButtons($phone, $header, $buttons, $tenant->whatsapp_number);
@@ -525,7 +590,7 @@ class LottoConversationEngine
                 stakeKobo: $stakeKobo,
                 walletSource: $walletSource
             );
-        } catch (DomainException $e) {
+        } catch (\Throwable $e) {
             $gateway->sendTextMessage($phone, "❌ {$e->getMessage()}\n\nReply *2* to fund your wallet.", $tenant->whatsapp_number);
             Cache::forget($sessionKey);
             return;
@@ -573,17 +638,21 @@ class LottoConversationEngine
         }
 
         // Scheduled 5/90 Draw receipt
-        $receipt = "🎟️ *BET PLACED SUCCESSFULLY!*\n"
-                 . "━━━━━━━━━━━━━━━━━━━━\n"
-                 . "• Draw: *{$draw->draw_code}*\n"
-                 . "• Ticket: *{$ticket->ticket_reference}*\n"
-                 . "• Selection: *{$numbersStr}*\n"
-                 . "• Stake: *{$tenant->currency} {$stakeNgn}* ({$walletSource})\n"
-                 . "• Cash Balance: *{$tenant->currency} {$newCashNgn}*\n"
-                 . "━━━━━━━━━━━━━━━━━━━━\n"
-                 . "Draw closing at {$draw->closes_at->format('H:i')} WAT.\n"
-                 . "Good luck! 🍀 Results announced post-draw.\n\n"
-                 . "Reply *MENU* for main options.";
+        $lang = $player->language ?? 'en';
+        $payoutPotentialNgn = number_format(($stakeKobo * 240) / 100, 2);
+        $sealPreview = substr($ticket->hash ?? ('HMAC-' . strtoupper(bin2hex(random_bytes(6)))), 0, 16) . '...';
+
+        $receipt = $this->msg('ticket_success', [
+            'ticket' => $ticket->ticket_reference,
+            'game' => $gameTitle,
+            'draw' => $draw->draw_code,
+            'numbers' => $numbersStr,
+            'currency' => $tenant->currency,
+            'stake' => $stakeNgn,
+            'payout' => $payoutPotentialNgn,
+            'seal' => $sealPreview,
+            'closes' => $draw->closes_at->format('H:i') . ' WAT',
+        ], $lang);
 
         $gateway->sendTextMessage($phone, $receipt, $tenant->whatsapp_number);
     }

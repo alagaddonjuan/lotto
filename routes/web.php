@@ -52,11 +52,6 @@ Route::middleware(['auth', 'two-factor.mandatory'])->group(function () {
     Route::post('/dashboard/invitations', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'invite'])->name('dashboard.invitations.create');
     Route::post('/dashboard/invite-rep', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'invite'])->name('dashboard.invite-rep');
 
-    // Simulation & Live Testing APIs
-    Route::post('/api/dashboard/simulate-bet', [DashboardController::class, 'simulateBet'])->name('dashboard.simulate-bet');
-    Route::post('/api/dashboard/simulate-deposit', [DashboardController::class, 'simulateDeposit'])->name('dashboard.simulate-deposit');
-    Route::post('/api/dashboard/toggle-2fa', [DashboardController::class, 'toggle2FA'])->name('dashboard.toggle-2fa');
-
     // Management Actions
     Route::post('/dashboard/create-tenant', [DashboardController::class, 'createTenant'])->name('dashboard.create-tenant');
 
@@ -65,6 +60,7 @@ Route::middleware(['auth', 'two-factor.mandatory'])->group(function () {
     Route::post('/dashboard/draws', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'store'])->name('dashboard.draws.store');
     Route::post('/dashboard/draws/{draw}/enter-results', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'enterResults'])->name('dashboard.draws.enter-results');
     Route::post('/dashboard/draws/{draw}/approve-results', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'approveResults'])->name('dashboard.draws.approve-results');
+    Route::post('/dashboard/draws/{draw}/void', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'voidDraw'])->name('dashboard.draws.void');
 
     // Settlement & Reconciliation Invoicing
     Route::get('/dashboard/export-settlement-csv', [SettlementStatementController::class, 'exportCsv'])->name('dashboard.export-csv');

@@ -36,14 +36,7 @@ return [
     ],
 
     'whatsapp' => [
-        'default' => env('WHATSAPP_DEFAULT_DRIVER', 'twilio'),
-    ],
-
-    'twilio' => [
-        'sid' => env('TWILIO_AUTH_SID'),
-        'token' => env('TWILIO_AUTH_TOKEN'),
-        'whatsapp_from' => env('TWILIO_WHATSAPP_FROM', 'whatsapp:+14155238886'),
-        'bypass_signature' => env('TWILIO_BYPASS_SIGNATURE', false),
+        'default' => env('WHATSAPP_DEFAULT_DRIVER', 'meta'),
     ],
 
     'meta' => [

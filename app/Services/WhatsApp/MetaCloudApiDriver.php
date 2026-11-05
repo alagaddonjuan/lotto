@@ -31,10 +31,16 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
         $body = '';
         if (isset($message['text']['body'])) {
             $body = $message['text']['body'];
+        } elseif (isset($message['button']['payload'])) {
+            $body = $message['button']['payload'];
         } elseif (isset($message['button']['text'])) {
             $body = $message['button']['text'];
+        } elseif (isset($message['interactive']['button_reply']['id'])) {
+            $body = $message['interactive']['button_reply']['id'];
         } elseif (isset($message['interactive']['button_reply']['title'])) {
             $body = $message['interactive']['button_reply']['title'];
+        } elseif (isset($message['interactive']['list_reply']['id'])) {
+            $body = $message['interactive']['list_reply']['id'];
         } elseif (isset($message['interactive']['list_reply']['title'])) {
             $body = $message['interactive']['list_reply']['title'];
         }
@@ -71,6 +77,10 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
         \Illuminate\Support\Facades\Cache::put("sim_reply:{$recipient}", $text, 120);
         $phoneId = $from ?: $this->phoneNumberId;
 
+        if (app()->environment('testing')) {
+            return true;
+        }
+
         $response = Http::withToken($this->accessToken)
             ->post("https://graph.facebook.com/{$this->apiVersion}/{$phoneId}/messages", [
                 'messaging_product' => 'whatsapp',
@@ -91,7 +101,12 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
     public function sendQuickReplyButtons(string $to, string $text, array $buttons, ?string $from = null): bool
     {
         $recipient = str_replace(['whatsapp:', '+', ' '], '', $to);
+        \Illuminate\Support\Facades\Cache::put("sim_reply:{$recipient}", $text, 120);
         $phoneId = $from ?: $this->phoneNumberId;
+
+        if (app()->environment('testing')) {
+            return true;
+        }
 
         $formattedButtons = [];
         foreach (array_slice($buttons, 0, 3) as $i => $btn) {
@@ -122,7 +137,12 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
     public function sendListMenu(string $to, string $header, string $buttonTitle, array $sections, ?string $from = null): bool
     {
         $recipient = str_replace(['whatsapp:', '+', ' '], '', $to);
+        \Illuminate\Support\Facades\Cache::put("sim_reply:{$recipient}", $header, 120);
         $phoneId = $from ?: $this->phoneNumberId;
+
+        if (app()->environment('testing')) {
+            return true;
+        }
 
         $response = Http::withToken($this->accessToken)
             ->post("https://graph.facebook.com/{$this->apiVersion}/{$phoneId}/messages", [

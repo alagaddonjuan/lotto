@@ -70,6 +70,13 @@ class DashboardController extends Controller
         $newPlayersToday = (clone $playersQuery)->whereDate('created_at', today())->count();
         $recentPlayers = (clone $playersQuery)->withCount('betTickets')->limit(20)->get();
 
+        // Player Language Preference Analytics
+        $languageStats = Player::where('tenant_id', $tenant->id)
+            ->selectRaw("COALESCE(NULLIF(language, ''), 'en') as lang, count(*) as count")
+            ->groupBy('lang')
+            ->pluck('count', 'lang')
+            ->toArray();
+
         // Active Reps for this tenant
         $tenantReps = User::where('tenant_id', $tenant->id)->get();
 
@@ -101,6 +108,7 @@ class DashboardController extends Controller
             'totalPlayers',
             'newPlayersToday',
             'recentPlayers',
+            'languageStats',
             'tenantReps',
             'games',
             'activeDraws',
@@ -128,130 +136,6 @@ class DashboardController extends Controller
     }
 
     /**
-     * Simulate placing a real WhatsApp bet directly from the dashboard.
-     */
-    public function simulateBet(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'tenant_id' => ['required', 'exists:tenants,id'],
-            'phone' => ['required', 'string'],
-            'game_code' => ['required', 'string'],
-            'stake' => ['required', 'numeric', 'min:50', 'max:50000'],
-        ]);
-
-        $tenant = Tenant::findOrFail($validated['tenant_id']);
-        $phone = preg_replace('/[^0-9]/', '', $validated['phone']);
-
-        $player = Player::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'phone' => $phone],
-            [
-                'name' => 'Demo Player ' . substr($phone, -4),
-                'pin_hash' => bcrypt('1234'),
-                'kyc_status' => 'BASIC',
-                'last_active_at' => now(),
-            ]
-        );
-        $player->update(['last_active_at' => now()]);
-
-        $ticketRef = 'ML-DASH-' . strtoupper(Str::random(8));
-        $selectedNumbers = [rand(1, 15), rand(16, 30), rand(31, 45), rand(46, 60), rand(61, 75)];
-
-        // Compute 35/65 split
-        $stake = (float)$validated['stake'];
-        $q4iShare = round(($stake * $tenant->q4i_split_percent) / 100, 2);
-        $operatorShare = round($stake - $q4iShare, 2);
-
-        // Record ticket
-        $ticket = BetTicket::create([
-            'tenant_id' => $tenant->id,
-            'player_id' => $player->id,
-            'ticket_reference' => $ticketRef,
-            'idempotency_key' => 'SIM_IDEMP_' . Str::random(24),
-            'game_code' => $validated['game_code'],
-            'selected_numbers' => $selectedNumbers,
-            'stake_amount' => $stake,
-            'currency' => $tenant->currency,
-            'q4i_share' => $q4iShare,
-            'operator_share' => $operatorShare,
-            'status' => 'accepted',
-            'placed_via' => 'dashboard_sim',
-        ]);
-
-        // Cryptographic HMAC-SHA256 Ledger
-        $this->ledgerService->recordBetPlacement($ticket);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Simulated ticket {$ticketRef} created successfully with 35% / 65% split!",
-            'ticket' => [
-                'reference' => $ticket->ticket_reference,
-                'stake' => $ticket->stake_amount,
-                'q4i_share' => $ticket->q4i_share,
-                'operator_share' => $ticket->operator_share,
-                'hash' => $ticket->hash,
-            ],
-        ]);
-    }
-
-    /**
-     * Simulate a Dedicated Virtual Account (DVA) bank deposit.
-     */
-    public function simulateDeposit(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'tenant_id' => ['required', 'exists:tenants,id'],
-            'phone' => ['required', 'string'],
-            'amount' => ['required', 'numeric', 'min:500', 'max:500000'],
-        ]);
-
-        $tenant = Tenant::findOrFail($validated['tenant_id']);
-        $phone = preg_replace('/[^0-9]/', '', $validated['phone']);
-
-        $player = Player::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'phone' => $phone],
-            ['name' => 'Player ' . substr($phone, -4), 'pin_hash' => bcrypt('1234')]
-        );
-
-        $operator = $this->operatorManager->driver($tenant);
-        $ref = 'DASH_DEP_' . strtoupper(Str::random(8));
-        $operator->creditWallet($phone, (float)$validated['amount'], $ref);
-        $wallet = $operator->checkWalletBalance($phone);
-
-        return response()->json([
-            'success' => true,
-            'message' => "₦" . number_format($validated['amount'], 2) . " credited to +{$phone} successfully!",
-            'balance' => $wallet['balance'],
-        ]);
-    }
-
-    /**
-     * Toggle Two-Factor Authentication (2FA) for current authenticated user.
-     */
-    public function toggle2FA(Request $request): JsonResponse
-    {
-        $user = Auth::user();
-        if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-
-        $user->two_factor_enabled = !$user->two_factor_enabled;
-        if ($user->two_factor_enabled) {
-            $user->generateTwoFactorCode();
-        } else {
-            $user->resetTwoFactorCode();
-        }
-        $user->save();
-
-        return response()->json([
-            'success' => true,
-            'two_factor_enabled' => $user->two_factor_enabled,
-            'message' => $user->two_factor_enabled
-                ? 'Two-Factor Authentication is now ENABLED for your account.'
-                : 'Two-Factor Authentication has been disabled.',
-        ]);
-    }
-
-    /**
      * Onboard a new operator tenant (Super Admin only).
      */
     public function createTenant(Request $request): RedirectResponse
@@ -276,7 +160,7 @@ class DashboardController extends Controller
             'country_code' => strtoupper($validated['country_code']),
             'currency' => strtoupper($validated['currency']),
             'whatsapp_number' => $validated['whatsapp_number'],
-            'whatsapp_driver' => 'twilio',
+            'whatsapp_driver' => 'meta',
             'operator_driver' => 'modern_lottery',
             'q4i_split_percent' => $validated['q4i_split_percent'],
             'operator_split_percent' => 100 - $validated['q4i_split_percent'],

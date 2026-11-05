@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use Database\Seeders\ModernLotterySeeder;
 use Database\Seeders\ModernLotteryUssdMenuSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class LottoBotEngineTest extends TestCase
@@ -21,44 +22,84 @@ class LottoBotEngineTest extends TestCase
     {
         parent::setUp();
 
+        \Illuminate\Support\Facades\Cache::flush();
+
         $this->seed(ModernLotterySeeder::class);
         $this->seed(ModernLotteryUssdMenuSeeder::class);
         $this->tenant = Tenant::where('slug', 'modern-lottery')->first();
 
-        // Bypass signatures in testing
-        config(['services.twilio.bypass_signature' => true]);
+        // Bypass signatures in testing for direct Meta Cloud API
+        config(['services.meta.bypass_signature' => true]);
+        config(['cache.default' => 'file']);
+    }
+
+    /**
+     * Helper to dispatch inbound WhatsApp webhook events using standard Meta Cloud API format.
+     */
+    protected function sendMetaMessage(string $fromPhone, string $text, ?string $buttonId = null): TestResponse
+    {
+        $messageData = [
+            'id' => 'wamid.' . uniqid(),
+            'from' => $fromPhone,
+        ];
+
+        if ($buttonId) {
+            $messageData['type'] = 'interactive';
+            $messageData['interactive'] = [
+                'type' => 'button_reply',
+                'button_reply' => [
+                    'id' => $buttonId,
+                    'title' => $text,
+                ],
+            ];
+        } else {
+            $messageData['type'] = 'text';
+            $messageData['text'] = ['body' => $text];
+        }
+
+        return $this->postJson('/api/webhook/meta', [
+            'object' => 'whatsapp_business_account',
+            'entry' => [
+                [
+                    'id' => 'WABA_10001',
+                    'changes' => [
+                        [
+                            'field' => 'messages',
+                            'value' => [
+                                'messaging_product' => 'whatsapp',
+                                'metadata' => [
+                                    'display_phone_number' => $this->tenant->whatsapp_number,
+                                    'phone_number_id' => '1000123456789',
+                                ],
+                                'contacts' => [
+                                    [
+                                        'profile' => ['name' => 'Test User'],
+                                        'wa_id' => $fromPhone,
+                                    ],
+                                ],
+                                'messages' => [$messageData],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
     }
 
     public function test_newcomer_onboarding_and_bet_placement_flow(): void
     {
         $playerPhone = '2348012345678';
-        $twilioSender = $this->tenant->whatsapp_number;
 
         // Step 1: Newcomer sends "HI" -> Welcomed and asked for Name
-        $res1 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => 'HI',
-            'MessageSid' => 'SM_TEST_001',
-        ]);
+        $res1 = $this->sendMetaMessage($playerPhone, 'HI');
         $res1->assertStatus(200);
 
         // Step 2: User provides Name "Michael" -> Asked for 4-digit PIN
-        $res2 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => 'Michael',
-            'MessageSid' => 'SM_TEST_002',
-        ]);
+        $res2 = $this->sendMetaMessage($playerPhone, 'Michael');
         $res2->assertStatus(200);
 
-        // Step 3: User sets 4-digit PIN "1234" -> Account created, trial wallet credited, Main Menu shown
-        $res3 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '1234',
-            'MessageSid' => 'SM_TEST_003',
-        ]);
+        // Step 3: User sets 4-digit PIN "1234" -> Account created, Main Menu shown
+        $res3 = $this->sendMetaMessage($playerPhone, '1234');
         $res3->assertStatus(200);
 
         // Verify Player record was updated
@@ -68,30 +109,15 @@ class LottoBotEngineTest extends TestCase
         $this->assertNotNull($player->pin_hash);
 
         // Step 4: User selects "1" -> Play Games (Item 113)
-        $res4 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '1',
-            'MessageSid' => 'SM_TEST_004',
-        ]);
+        $res4 = $this->sendMetaMessage($playerPhone, '1');
         $res4->assertStatus(200);
 
         // Step 5: User selects "1" -> Keno 20/80 (Item 114)
-        $res5 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '1',
-            'MessageSid' => 'SM_TEST_005',
-        ]);
+        $res5 = $this->sendMetaMessage($playerPhone, '1');
         $res5->assertStatus(200);
 
         // Step 6: User selects "1" -> Select Balls (Item 115, API)
-        $res6 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '1',
-            'MessageSid' => 'SM_TEST_006',
-        ]);
+        $res6 = $this->sendMetaMessage($playerPhone, '1');
         $res6->assertStatus(200);
 
         // Credit cash balance for real clearinghouse betting
@@ -99,30 +125,15 @@ class LottoBotEngineTest extends TestCase
         $player->update(['cash_balance_kobo' => 100000]); // ₦1,000.00
 
         // Step 7: User chooses Quick Pick "QP"
-        $res7 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => 'QP',
-            'MessageSid' => 'SM_TEST_007',
-        ]);
+        $res7 = $this->sendMetaMessage($playerPhone, 'QP');
         $res7->assertStatus(200);
 
         // Step 8: User enters stake "200"
-        $res8 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '200',
-            'MessageSid' => 'SM_TEST_008',
-        ]);
+        $res8 = $this->sendMetaMessage($playerPhone, '200');
         $res8->assertStatus(200);
 
         // Step 9: User confirms with "1" (One-touch confirmation, no plaintext PIN)
-        $res9 = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '1',
-            'MessageSid' => 'SM_TEST_009',
-        ]);
+        $res9 = $this->sendMetaMessage($playerPhone, '1');
         $res9->assertStatus(200);
 
         // Verify Bet Ticket & Ledger Split (35% Q4I / 65% Modern Lottery)
@@ -142,7 +153,6 @@ class LottoBotEngineTest extends TestCase
     public function test_deep_dial_shortcuts_for_registered_player(): void
     {
         $playerPhone = '2348099887766';
-        $twilioSender = $this->tenant->whatsapp_number;
 
         // Create player with a name
         Player::create([
@@ -152,28 +162,17 @@ class LottoBotEngineTest extends TestCase
         ]);
 
         // Chained command "5*1" -> Directly checks Credit Balance
-        $res = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '5*1',
-            'MessageSid' => 'SM_DEEP_001',
-        ]);
+        $res = $this->sendMetaMessage($playerPhone, '5*1');
         $res->assertStatus(200);
 
         // Command "6" -> Directly opens Contact Us
-        $resContact = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => '6',
-            'MessageSid' => 'SM_DEEP_002',
-        ]);
+        $resContact = $this->sendMetaMessage($playerPhone, '6');
         $resContact->assertStatus(200);
     }
 
     public function test_fast_line_bet_shortcut(): void
     {
         $playerPhone = '2348077665544';
-        $twilioSender = $this->tenant->whatsapp_number;
 
         // Player with cash balance
         Player::create([
@@ -184,12 +183,7 @@ class LottoBotEngineTest extends TestCase
         ]);
 
         // Single-line bet: "KENO QP 300" (Institutional standard: no PIN in chat)
-        $fastBetRes = $this->postJson('/api/webhook/twilio', [
-            'From' => "whatsapp:+{$playerPhone}",
-            'To' => "whatsapp:{$twilioSender}",
-            'Body' => 'KENO QP 300',
-            'MessageSid' => 'SM_FAST_001',
-        ]);
+        $fastBetRes = $this->sendMetaMessage($playerPhone, 'KENO QP 300');
         $fastBetRes->assertStatus(200);
 
         $ticket = BetTicket::where('tenant_id', $this->tenant->id)
@@ -199,5 +193,31 @@ class LottoBotEngineTest extends TestCase
         $this->assertNotNull($ticket);
         $this->assertEquals(105.00, $ticket->q4i_share);       // 35% of 300 = 105
         $this->assertEquals(195.00, $ticket->operator_share); // 65% of 300 = 195
+    }
+
+    public function test_nigerian_language_selection_and_pidgin_support(): void
+    {
+        $playerPhone = '2348033221100';
+
+        $player = Player::create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => $playerPhone,
+            'name' => 'Chidi',
+            'language' => 'en',
+        ]);
+
+        // Switch language to Nigerian Pidgin
+        $res = $this->sendMetaMessage($playerPhone, 'LANG PCM');
+        $res->assertStatus(200);
+
+        $player->refresh();
+        $this->assertEquals('pcm', $player->language);
+
+        // Switch to Yoruba
+        $resYo = $this->sendMetaMessage($playerPhone, 'LANG YO');
+        $resYo->assertStatus(200);
+
+        $player->refresh();
+        $this->assertEquals('yo', $player->language);
     }
 }

@@ -13,7 +13,7 @@ interface WhatsAppGatewayInterface
     public function parseIncomingRequest(Request $request): IncomingMessageDTO;
 
     /**
-     * Validate the webhook signature (X-Twilio-Signature or X-Hub-Signature-256).
+     * Validate the webhook signature (X-Hub-Signature-256).
      */
     public function validateSignature(Request $request): bool;
 

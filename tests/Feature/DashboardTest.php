@@ -81,21 +81,37 @@ class DashboardTest extends TestCase
         $this->assertEquals(65.00, $response->json('splits.operator_percentage'));
     }
 
-    public function test_simulate_bet_api_records_35_65_split(): void
+    public function test_institutional_bet_placement_records_35_65_split(): void
     {
         $tenant = Tenant::first();
-
-        $response = $this->actingAs($this->adminUser)->postJson('/api/dashboard/simulate-bet', [
+        $player = \App\Models\Player::create([
             'tenant_id' => $tenant->id,
             'phone' => '2348039876543',
-            'game_code' => '5_90_DAILY',
-            'stake' => 1000,
+            'name' => 'Real Player',
+            'cash_balance_kobo' => 500000,
         ]);
 
-        $response->assertStatus(200);
-        $response->assertJson(['success' => true]);
-        $this->assertEquals(350.00, $response->json('ticket.q4i_share'));
-        $this->assertEquals(650.00, $response->json('ticket.operator_share'));
+        $game = \App\Models\LottoGame::first();
+        $draw = \App\Models\GameDraw::create([
+            'tenant_id' => $tenant->id,
+            'lotto_game_id' => $game->id,
+            'draw_code' => 'TEST-SPLIT-DRAW',
+            'status' => \App\Models\GameDraw::STATUS_OPEN,
+            'opens_at' => now(),
+            'closes_at' => now()->addHour(),
+        ]);
+
+        $placeBetService = app(\App\Services\Betting\PlaceBetService::class);
+        $ticket = $placeBetService->placeBet(
+            player: $player,
+            gameDraw: $draw,
+            selectedNumbers: [5, 12, 23, 44, 78],
+            stakeKobo: 100000 // ₦1,000.00
+        );
+
+        $this->assertEquals(1000.00, $ticket->stake_amount);
+        $this->assertEquals(350.00, $ticket->q4i_share);
+        $this->assertEquals(650.00, $ticket->operator_share);
     }
 
     public function test_settlement_invoice_renders_printable_statement(): void

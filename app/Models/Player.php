@@ -15,6 +15,7 @@ class Player extends Model
         'tenant_id',
         'phone',
         'name',
+        'language',
         'pin_hash',
         'withdrawal_pin_hash',
         'cash_balance_kobo',

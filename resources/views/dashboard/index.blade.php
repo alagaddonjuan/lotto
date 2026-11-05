@@ -32,6 +32,11 @@
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                         HMAC-SHA256: 100% Sealed
                     </span>
+                    <!-- Meta Cloud API Badge -->
+                    <span class="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1.5 font-semibold hidden sm:flex">
+                        <i class="fa-brands fa-whatsapp text-emerald-400"></i>
+                        Direct Meta Cloud API (v20.0)
+                    </span>
                 </div>
                 <p class="text-xs text-slate-400 mt-1">
                     Operator: <strong class="text-slate-200">{{ $tenant->name }}</strong> &bull; <span class="font-mono text-emerald-400">35/65 Split Clearinghouse</span>
@@ -199,7 +204,7 @@
                 <div class="bg-gradient-to-br from-emerald-950/40 to-slate-900/80 border border-emerald-500/40 rounded-2xl p-5 shadow-sm">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Q4I Commission (35%)</p>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Q4I Clearinghouse (35%)</p>
                             <h3 class="text-2xl font-black mt-2 text-emerald-300 font-mono" id="statQ4iCommission">
                                 {{ $tenant->currency }} {{ number_format($balanceSheet['splits']['q4i_accrued_earned'], 2) }}
                             </h3>
@@ -208,7 +213,14 @@
                             <i class="fa-solid fa-hand-holding-dollar"></i>
                         </div>
                     </div>
-                    <p class="text-xs text-emerald-400/80 mt-4 font-mono">Accrued Platform Commission</p>
+                    <div class="mt-4 flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Settled Realized</span>
+                        @if(($balanceSheet['splits']['q4i_escrow_pending'] ?? 0) > 0)
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-mono">
+                                +{{ $tenant->currency }} {{ number_format($balanceSheet['splits']['q4i_escrow_pending'], 2) }} escrow
+                            </span>
+                        @endif
+                    </div>
                 </div>
 
                 <!-- Operator Share 65% -->
@@ -224,7 +236,14 @@
                             <i class="fa-solid fa-building-columns"></i>
                         </div>
                     </div>
-                    <p class="text-xs text-slate-400 mt-4 font-mono">{{ $tenant->name }} Game Pool</p>
+                    <div class="mt-4 flex items-center justify-between text-xs">
+                        <span class="text-slate-400">{{ $tenant->name }} Prize Reserve</span>
+                        @if(($balanceSheet['splits']['operator_escrow_pending'] ?? 0) > 0)
+                            <span class="text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded font-mono">
+                                +{{ $tenant->currency }} {{ number_format($balanceSheet['splits']['operator_escrow_pending'], 2) }} escrow
+                            </span>
+                        @endif
+                    </div>
                 </div>
 
                 <!-- Available to Settle -->
@@ -454,6 +473,16 @@
                                         Open for bets (Closes {{ $draw->closes_at ? $draw->closes_at->diffForHumans() : '' }})
                                     </span>
                                 @endif
+
+                                @if(!in_array($draw->status, ['SETTLED', 'VOID']))
+                                    <form method="POST" action="{{ route('dashboard.draws.void', $draw->id) }}" onsubmit="return confirm('Are you sure you want to void draw {{ $draw->draw_code }}? All open tickets will be refunded with 0 commission leakage.');">
+                                        @csrf
+                                        <button type="submit" class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold transition flex items-center gap-1" title="Void Draw & Refund All Stakes">
+                                            <i class="fa-solid fa-ban text-[10px]"></i>
+                                            <span>Void</span>
+                                        </button>
+                                    </form>
+                                @endif
                             </div>
                         </div>
                     @empty
@@ -533,6 +562,46 @@
         <!-- TAB 4: REGISTERED PLAYERS                 -->
         <!-- ========================================== -->
         <div id="tab-content-players" class="tab-pane hidden space-y-6">
+
+            <!-- Nigerian Language Distribution KPI -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between shadow-sm">
+                    <div>
+                        <p class="text-[10px] uppercase font-mono text-slate-400">🇬🇧 English</p>
+                        <p class="text-lg font-bold text-white font-mono mt-0.5">{{ $languageStats['en'] ?? 0 }}</p>
+                    </div>
+                    <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">en</span>
+                </div>
+                <div class="bg-slate-900/70 border border-emerald-500/30 rounded-xl p-3.5 flex items-center justify-between shadow-sm">
+                    <div>
+                        <p class="text-[10px] uppercase font-mono text-emerald-400">🇳🇬 Pidgin</p>
+                        <p class="text-lg font-bold text-emerald-300 font-mono mt-0.5">{{ $languageStats['pcm'] ?? 0 }}</p>
+                    </div>
+                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-mono">pcm</span>
+                </div>
+                <div class="bg-slate-900/70 border border-amber-500/30 rounded-xl p-3.5 flex items-center justify-between shadow-sm">
+                    <div>
+                        <p class="text-[10px] uppercase font-mono text-amber-400">🟡 Yorùbá</p>
+                        <p class="text-lg font-bold text-amber-300 font-mono mt-0.5">{{ $languageStats['yo'] ?? 0 }}</p>
+                    </div>
+                    <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded font-mono">yo</span>
+                </div>
+                <div class="bg-slate-900/70 border border-cyan-500/30 rounded-xl p-3.5 flex items-center justify-between shadow-sm">
+                    <div>
+                        <p class="text-[10px] uppercase font-mono text-cyan-400">🟢 Hausa</p>
+                        <p class="text-lg font-bold text-cyan-300 font-mono mt-0.5">{{ $languageStats['ha'] ?? 0 }}</p>
+                    </div>
+                    <span class="text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded font-mono">ha</span>
+                </div>
+                <div class="bg-slate-900/70 border border-rose-500/30 rounded-xl p-3.5 flex items-center justify-between shadow-sm">
+                    <div>
+                        <p class="text-[10px] uppercase font-mono text-rose-400">🔴 Igbo</p>
+                        <p class="text-lg font-bold text-rose-300 font-mono mt-0.5">{{ $languageStats['ig'] ?? 0 }}</p>
+                    </div>
+                    <span class="text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded font-mono">ig</span>
+                </div>
+            </div>
+
             <div class="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                 <div class="p-6 border-b border-slate-800 flex justify-between items-center">
                     <div>
@@ -550,6 +619,7 @@
                             <tr>
                                 <th class="px-6 py-4">Player Name</th>
                                 <th class="px-6 py-4">Phone</th>
+                                <th class="px-6 py-4">Language</th>
                                 <th class="px-6 py-4">Cash Wallet (Real)</th>
                                 <th class="px-6 py-4">Bonus Wallet (Promo)</th>
                                 <th class="px-6 py-4">Total Bets</th>
@@ -562,6 +632,21 @@
                                 <tr class="hover:bg-slate-800/30 transition">
                                     <td class="px-6 py-4 font-bold text-white">{{ $p->name }}</td>
                                     <td class="px-6 py-4 font-mono text-slate-300">+{{ $p->phone }}</td>
+                                    <td class="px-6 py-4">
+                                        @php
+                                            $langMap = [
+                                                'en' => ['🇬🇧 English', 'bg-slate-800 text-slate-300'],
+                                                'pcm' => ['🇳🇬 Pidgin', 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'],
+                                                'yo' => ['🟡 Yorùbá', 'bg-amber-500/10 text-amber-400 border border-amber-500/30'],
+                                                'ha' => ['🟢 Hausa', 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'],
+                                                'ig' => ['🔴 Igbo', 'bg-rose-500/10 text-rose-400 border border-rose-500/30'],
+                                            ];
+                                            $l = $langMap[$p->language ?? 'en'] ?? ['🇬🇧 English', 'bg-slate-800 text-slate-300'];
+                                        @endphp
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold {{ $l[1] }}">
+                                            {{ $l[0] }}
+                                        </span>
+                                    </td>
                                     <td class="px-6 py-4 font-mono font-bold text-emerald-400">
                                         {{ $tenant->currency }} {{ number_format(($p->cash_balance_kobo ?? 0) / 100, 2) }}
                                     </td>
@@ -578,7 +663,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center py-12 text-slate-500 italic">No registered players yet.</td>
+                                    <td colspan="8" class="text-center py-12 text-slate-500 italic">No registered players yet.</td>
                                 </tr>
                             @endforelse
                         </tbody>

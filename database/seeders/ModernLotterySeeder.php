@@ -16,8 +16,8 @@ class ModernLotterySeeder extends Seeder
                 'name' => 'Modern Lottery Limited',
                 'country_code' => 'NG',
                 'currency' => 'NGN',
-                'whatsapp_number' => '+14155238886', // Twilio Sandbox or live number
-                'whatsapp_driver' => 'twilio',
+                'whatsapp_number' => '+2348000000000', // Meta Cloud API Phone Number
+                'whatsapp_driver' => 'meta',
                 'operator_driver' => 'modern_lottery',
                 'operator_api_url' => 'https://api.modernlottery.ng/v1',
                 'operator_api_key' => 'mock_key',

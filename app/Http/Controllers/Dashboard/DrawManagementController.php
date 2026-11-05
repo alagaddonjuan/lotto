@@ -138,5 +138,64 @@ class DrawManagementController extends Controller
 
         return back()->with('success', "Draw {$draw->draw_code} approved! Payout calculations and wallet settlements executed.");
     }
+
+    /**
+     * Void a draw and execute 100% refund of all open tickets with 0 commission leakage.
+     */
+    public function voidDraw(Request $request, GameDraw $draw): RedirectResponse|JsonResponse
+    {
+        if (in_array($draw->status, [GameDraw::STATUS_SETTLED, GameDraw::STATUS_VOID])) {
+            throw ValidationException::withMessages([
+                'draw' => "Cannot void draw: already settled or voided.",
+            ]);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($draw) {
+            $lockedDraw = GameDraw::where('id', $draw->id)->lockForUpdate()->firstOrFail();
+            $tickets = \App\Models\BetTicket::where('game_draw_id', $lockedDraw->id)
+                ->where('lifecycle_status', 'OPEN')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($tickets as $ticket) {
+                if ($ticket->wallet_source === 'CASH') {
+                    $player = \App\Models\Player::where('id', $ticket->player_id)->lockForUpdate()->first();
+                    if ($player) {
+                        $player->cash_balance_kobo += $ticket->stake_kobo;
+                        $player->save();
+                    }
+                } elseif ($ticket->wallet_source === 'BONUS') {
+                    $player = \App\Models\Player::where('id', $ticket->player_id)->lockForUpdate()->first();
+                    if ($player) {
+                        $player->bonus_balance_kobo += $ticket->stake_kobo;
+                        $player->save();
+                    }
+                }
+
+                $ticket->update([
+                    'lifecycle_status' => 'REFUNDED',
+                    'q4i_commission_kobo' => 0,
+                    'operator_pool_kobo' => 0,
+                    'q4i_share' => 0,
+                    'operator_share' => 0,
+                    'status' => 'voided',
+                ]);
+            }
+
+            $lockedDraw->update([
+                'status' => GameDraw::STATUS_VOID,
+            ]);
+        });
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Draw {$draw->draw_code} voided and all player stakes refunded.",
+                'draw' => $draw->fresh(),
+            ]);
+        }
+
+        return back()->with('success', "Draw {$draw->draw_code} has been voided and all player stakes refunded.");
+    }
 }
 
