@@ -227,14 +227,14 @@ class AuthAndPlayerPortalTest extends TestCase
             }
         );
 
-        // Challenge screen renders and in testing/log mode includes the active code preview
+        // Challenge screen renders cleanly without exposing the 2FA OTP code on screen
         $challengeRes = $this->withSession([
             'auth.2fa.id' => $user->id,
         ])->get('/two-factor-challenge');
 
         $challengeRes->assertStatus(200);
-        $challengeRes->assertSee($user->fresh()->two_factor_code);
-        $challengeRes->assertSee('Quick Fill & Login', false);
+        $challengeRes->assertDontSee($user->fresh()->two_factor_code);
+        $challengeRes->assertDontSee('Quick Fill');
     }
 
     public function test_auth_manage_artisan_command(): void

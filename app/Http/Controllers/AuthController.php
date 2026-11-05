@@ -57,15 +57,12 @@ class AuthController extends Controller
                 Log::warning("[2FA Security] Notification dispatch failed for {$user->email}: " . $e->getMessage());
             }
 
-            Log::info("========================================\n[2FA AUTHENTICATION OTP ISSUED]\nUser: {$user->email}\nCode: {$otp}\nExpires: 10 minutes\n========================================");
-
-            $isNonSmtp = config('mail.default') === 'log' || empty(config('mail.mailers.smtp.username')) || app()->environment('local');
+            Log::info("[2FA Security] Authentication challenge issued for {$user->email}");
 
             session([
                 'auth.2fa.id' => $user->id,
                 'auth.2fa.remember' => $request->boolean('remember'),
                 'auth.2fa.email' => $user->email,
-                'auth.2fa.code_preview' => $isNonSmtp ? $otp : null,
             ]);
 
             return redirect()->route('two-factor.challenge')
@@ -94,17 +91,12 @@ class AuthController extends Controller
 
         $user = User::find(session('auth.2fa.id'));
         if (! $user) {
-            session()->forget(['auth.2fa.id', 'auth.2fa.remember', 'auth.2fa.email', 'auth.2fa.code_preview']);
+            session()->forget(['auth.2fa.id', 'auth.2fa.remember', 'auth.2fa.email']);
             return redirect()->route('login');
         }
 
-        $isNonSmtp = config('mail.default') === 'log' || empty(config('mail.mailers.smtp.username')) || app()->environment('local');
-        $codePreview = $isNonSmtp ? ($user->two_factor_code ?? session('auth.2fa.code_preview')) : null;
-
         return view('auth.two-factor', [
             'email' => $user->email,
-            'codePreview' => $codePreview,
-            'isNonSmtp' => $isNonSmtp,
         ]);
     }
 
@@ -128,7 +120,7 @@ class AuthController extends Controller
         }
 
         $remember = session('auth.2fa.remember', false);
-        session()->forget(['auth.2fa.id', 'auth.2fa.remember', 'auth.2fa.email', 'auth.2fa.code_preview']);
+        session()->forget(['auth.2fa.id', 'auth.2fa.remember', 'auth.2fa.email']);
 
         Auth::login($user, $remember);
         $request->session()->regenerate();
@@ -156,14 +148,9 @@ class AuthController extends Controller
                 Log::warning("[2FA Security] Notification resend failed for {$user->email}: " . $e->getMessage());
             }
 
-            Log::info("========================================\n[2FA AUTHENTICATION OTP RE-ISSUED]\nUser: {$user->email}\nCode: {$otp}\n========================================");
+            Log::info("[2FA Security] Authentication challenge re-issued for {$user->email}");
 
-            $isNonSmtp = config('mail.default') === 'log' || empty(config('mail.mailers.smtp.username')) || app()->environment('local');
-            if ($isNonSmtp) {
-                session(['auth.2fa.code_preview' => $otp]);
-            }
-
-            return back()->with('status', 'A fresh 6-digit verification code has been dispatched.');
+            return back()->with('status', 'A fresh 6-digit verification code has been dispatched to your corporate email.');
         }
 
         return redirect()->route('login');
@@ -193,16 +180,11 @@ class AuthController extends Controller
                 Log::warning("[2FA Setup] Notification dispatch failed: " . $e->getMessage());
             }
 
-            Log::info("[2FA Setup] Mandatory 2FA activation code issued for {$user->email}: {$otp}");
+            Log::info("[2FA Setup] Mandatory 2FA activation code issued for {$user->email}");
         }
-
-        $isNonSmtp = config('mail.default') === 'log' || empty(config('mail.mailers.smtp.username')) || app()->environment('local');
-        $codePreview = $isNonSmtp ? $user->two_factor_code : null;
 
         return view('auth.two-factor-setup', [
             'user' => $user,
-            'codePreview' => $codePreview,
-            'isNonSmtp' => $isNonSmtp,
         ]);
     }
 
