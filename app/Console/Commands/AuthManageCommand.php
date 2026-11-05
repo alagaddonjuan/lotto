@@ -18,6 +18,7 @@ class AuthManageCommand extends Command
                             {--get-otp : View active 2FA OTP code and expiration}
                             {--disable-2fa : Immediately disable two-factor authentication}
                             {--enable-2fa : Immediately enable two-factor authentication}
+                            {--test-mail : Dispatch a live test 2FA email via SMTP and show diagnostics}
                             {--set-password= : Reset the user password}';
 
     /**
@@ -87,6 +88,26 @@ class AuthManageCommand extends Command
 
             $this->info("Password for [{$user->email}] successfully updated.");
             return Command::SUCCESS;
+        }
+
+        if ($this->option('test-mail')) {
+            $this->info("=== SMTP Transport Diagnostics ===");
+            $this->line("Default Mailer: " . config('mail.default'));
+            $this->line("SMTP Host:      " . config('mail.mailers.smtp.host'));
+            $this->line("SMTP Port:      " . config('mail.mailers.smtp.port'));
+            $this->line("SMTP Scheme:    " . config('mail.mailers.smtp.scheme'));
+            $this->line("SMTP Username:  " . (config('mail.mailers.smtp.username') ?: '(empty)'));
+            $this->line("From Address:   " . config('mail.from.address'));
+
+            $otp = $user->generateTwoFactorCode();
+            try {
+                $user->notify(new \App\Notifications\TwoFactorCodeNotification($otp));
+                $this->info("SUCCESS: 2FA verification email (Code: {$otp}) dispatched to [{$user->email}] via [" . config('mail.default') . "] mailer.");
+                return Command::SUCCESS;
+            } catch (\Throwable $e) {
+                $this->error("SMTP ERROR: " . $e->getMessage());
+                return Command::FAILURE;
+            }
         }
 
         // Default detail view

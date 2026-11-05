@@ -14,7 +14,9 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    'default' => (env('APP_ENV') !== 'testing' && env('MAIL_MAILER', 'log') === 'log' && (! empty(env('MAIL_USERNAME')) || (env('MAIL_HOST', '127.0.0.1') !== '127.0.0.1')))
+        ? 'smtp'
+        : env('MAIL_MAILER', 'smtp'),
 
     /*
     |--------------------------------------------------------------------------
@@ -39,14 +41,17 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => env('MAIL_SCHEME'),
+            'scheme' => in_array(strtolower((string) env('MAIL_SCHEME', env('MAIL_ENCRYPTION', ''))), ['ssl', 'smtps'], true) || (int) env('MAIL_PORT', 2525) === 465
+                ? 'smtps'
+                : 'smtp',
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 2525),
+            'port' => env('MAIL_PORT', 465),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
-            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            'timeout' => 15,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'https://lotto.q4iltd.com'), PHP_URL_HOST)),
+            'verify_peer' => (bool) env('MAIL_VERIFY_PEER', false),
         ],
 
         'ses' => [
