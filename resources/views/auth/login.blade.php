@@ -12,8 +12,8 @@
     <div class="w-full max-w-md">
         <!-- Logo & Title -->
         <div class="text-center mb-8">
-            <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 items-center justify-center font-black text-2xl text-slate-950 shadow-xl shadow-emerald-500/20 mb-4">
-                Q
+            <div class="inline-flex items-center justify-center mb-4">
+                <img src="https://q4iltd.com/color@6x.png" onerror="this.src='{{ asset('images/q4i-logo.png') }}'" alt="Q4I Limited" class="h-16 w-auto object-contain drop-shadow-2xl">
             </div>
             <h1 class="text-2xl font-black text-white tracking-tight">Q4I Financial Engine</h1>
             <p class="text-xs text-slate-400 mt-1">Multi-Tenant Lottery Operator & Commission Clearinghouse</p>
@@ -45,7 +45,7 @@
                             <i class="fa-solid fa-envelope"></i>
                         </span>
                         <input type="email" id="email" name="email" value="{{ old('email') }}" required autofocus
-                            placeholder="name@modernlottery.ng or admin@q4iltd.com"
+                            placeholder="admin@q4iltd.com or corporate email"
                             class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
                     </div>
                 </div>

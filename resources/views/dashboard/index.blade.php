@@ -21,8 +21,8 @@
     <header class="border-b border-slate-800 bg-slate-950/95 backdrop-blur sticky top-0 z-40 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
         <!-- Brand / Identity -->
         <div class="flex items-center gap-3.5">
-            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center font-black text-2xl text-slate-950 shadow-xl shadow-emerald-500/20">
-                Q
+            <div class="flex items-center justify-center">
+                <img src="https://q4iltd.com/color@6x.png" onerror="this.src='{{ asset('images/q4i-logo.png') }}'" alt="Q4I Limited" class="h-11 w-auto object-contain drop-shadow-md">
             </div>
             <div>
                 <div class="flex items-center gap-2.5">
@@ -693,7 +693,7 @@
 
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Staff Corporate Email</label>
-                            <input type="email" name="email" required placeholder="manager@modernlottery.ng" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-purple-500 focus:outline-none">
+                            <input type="email" name="email" required placeholder="rep@operator.com or staff@company.com" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-purple-500 focus:outline-none">
                         </div>
 
                         <div>

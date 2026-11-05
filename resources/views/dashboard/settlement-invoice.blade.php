@@ -44,9 +44,7 @@
             <div class="flex flex-wrap justify-between items-start border-b border-slate-200 pb-8 gap-6">
                 <div>
                     <div class="flex items-center gap-3 mb-2">
-                        <div class="w-10 h-10 rounded-xl bg-slate-950 text-white flex items-center justify-center font-black text-xl">
-                            Q
-                        </div>
+                        <img src="https://q4iltd.com/color@6x.png" onerror="this.src='{{ asset('images/q4i-logo.png') }}'" alt="Q4I Limited" class="h-10 w-auto object-contain">
                         <h1 class="text-2xl font-black tracking-tight text-slate-950">Q4I LIMITED</h1>
                     </div>
                     <p class="text-xs text-slate-500">Lottery Technology Provider & Middleware Engine</p>

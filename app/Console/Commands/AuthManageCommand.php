@@ -101,3 +101,4 @@ class AuthManageCommand extends Command
         return Command::SUCCESS;
     }
 }
+

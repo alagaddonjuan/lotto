@@ -32,3 +32,4 @@ class OperatorInvitationNotification extends Notification
             ->line('If you did not expect this invitation, please ignore this notice.');
     }
 }
+

@@ -12,8 +12,8 @@
     <div class="w-full max-w-md">
         <!-- Logo & Title -->
         <div class="text-center mb-8">
-            <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 items-center justify-center font-black text-2xl text-slate-950 shadow-xl shadow-amber-500/20 mb-4">
-                <i class="fa-solid fa-shield-halved text-slate-950"></i>
+            <div class="inline-flex items-center justify-center mb-4">
+                <img src="https://q4iltd.com/color@6x.png" onerror="this.src='{{ asset('images/q4i-logo.png') }}'" alt="Q4I Limited" class="h-16 w-auto object-contain drop-shadow-2xl">
             </div>
             <h1 class="text-2xl font-black text-white tracking-tight">Security Policy Mandate</h1>
             <p class="text-xs text-slate-400 mt-1">Configure Two-Factor Authentication (2FA)</p>

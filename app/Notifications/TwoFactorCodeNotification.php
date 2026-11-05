@@ -29,3 +29,4 @@ class TwoFactorCodeNotification extends Notification
             ->line('If you did not initiate this login request, please alert your security team immediately.');
     }
 }
+
