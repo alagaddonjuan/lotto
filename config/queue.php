@@ -13,7 +13,9 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'database'),
+    'default' => env('QUEUE_WORKER_DAEMON', false)
+        ? env('QUEUE_CONNECTION', 'database')
+        : 'sync',
 
     /*
     |--------------------------------------------------------------------------

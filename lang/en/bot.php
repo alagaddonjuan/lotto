@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'welcome_header' => "🎰 *Welcome to :tenant!* 👋\nNigeria's institutional lottery clearinghouse.\n\nInstant payouts & audited daily draws in *Ghana 5/90* and *Keno 20/80*!",
+    'welcome_header' => "🎰 *Welcome to :tenant!* 👋\nNigeria's institutional lottery clearinghouse.\n\nInstant payouts & audited daily draws in *5/90 Direct*, *Fast 3*, and *Keno 20/80*!",
     'ask_name' => "👉 *What is your first name or nickname?*",
     'invalid_name' => "👋 Please reply with your first name or nickname (e.g. *Michael*):",
     'welcome_name' => "Awesome to have you, *:name*! 🎉\n\n🔐 Choose a *4-digit Security Withdrawal PIN* to protect your bank payouts (e.g. *5829*):\n_(You will never be asked for this PIN to place bets)_",

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'welcome_header' => "🎰 *Welcome to :tenant!* 👋\nNaija sure lottery clearinghouse wey no dey carry last.\n\nSharp-sharp bank transfer payout & legit daily draws inside *Ghana 5/90* and *Keno 20/80*!",
+    'welcome_header' => "🎰 *Welcome to :tenant!* 👋\nNaija sure lottery clearinghouse wey no dey carry last.\n\nSharp-sharp bank transfer payout & legit daily draws inside *5/90 Direct*, *Fast 3*, and *Keno 20/80*!",
     'ask_name' => "👉 *Wetyn be your first name or guy-name?*",
     'invalid_name' => "👋 Abeg tell us your first name or guy-name (e.g. *Michael*):",
     'welcome_name' => "Oya make we roll, *:name*! 🎉\n\n🔐 Pick one *4-digit Security PIN* (like *5829*) make your cash withdrawal dey safe:\n_(We no go ever ask you for this PIN when you wan play bet)_",

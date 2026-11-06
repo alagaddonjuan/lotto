@@ -65,7 +65,7 @@
                         Newcomer Registration
                     </h2>
                     <span class="text-[11px] bg-emerald-500/10 text-emerald-400 font-semibold px-2 py-0.5 rounded-full">
-                        +₦4,500 Bonus
+                        +₦500 Trial Bonus
                     </span>
                 </div>
 
@@ -98,7 +98,7 @@
                     <button type="submit" id="regBtn"
                         class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 font-bold text-xs text-slate-950 shadow-md shadow-emerald-500/20 transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-gift"></i>
-                        <span>Register & Load ₦4,500 Trial Balance</span>
+                        <span>Register &amp; Load ₦500 Promotional Bonus</span>
                     </button>
                 </form>
 
@@ -228,8 +228,14 @@ _Reply with a number or type a command like "KENO 500"_
                 <button onclick="sendQuickMessage('3')" class="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 transition shrink-0">
                     3️⃣ Keno
                 </button>
-                <button onclick="sendQuickMessage('KENO QP 300 1234')" class="px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50 transition shrink-0 font-mono">
+                <button onclick="sendQuickMessage('KENO QP 300')" class="px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50 transition shrink-0 font-mono">
                     ⚡ Quick Bet: Keno ₦300
+                </button>
+                <button onclick="sendQuickMessage('LANG')" class="px-3 py-1.5 rounded-full bg-blue-950/60 border border-blue-500/30 text-blue-300 hover:bg-blue-900/50 transition shrink-0">
+                    🌐 Language
+                </button>
+                <button onclick="sendQuickMessage('WITHDRAW 1000')" class="px-3 py-1.5 rounded-full bg-amber-950/60 border border-amber-500/30 text-amber-300 hover:bg-amber-900/50 transition shrink-0">
+                    🏦 Withdraw ₦1,000
                 </button>
             </div>
 
@@ -355,9 +361,9 @@ _Reply with a number or type a command like "KENO 500"_
                     alertBox.className = "mt-3 p-3 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
                     alertBox.innerText = data.message;
                     alertBox.classList.remove('hidden');
-                    walletHeader.innerText = '{{ $tenant->currency }} ' + Number(data.player.balance).toLocaleString('en-US', {minimumFractionDigits: 2});
+                    walletHeader.innerText = '{{ $tenant->currency }} ' + (data.player.cash_balance || '0.00');
 
-                    appendMessage(`🎉 Welcome, *${name}*! Your account is active with trial balance. Type *1* to start playing!`, false);
+                    appendMessage(`🎉 Welcome, *${name}*! Your account is active with ₦500.00 promotional bonus. Type *1* to start playing!`, false);
                 }
             } catch (err) {
                 alertBox.className = "mt-3 p-3 rounded-xl text-xs bg-rose-500/10 border border-rose-500/30 text-rose-400";

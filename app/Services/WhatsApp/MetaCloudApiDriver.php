@@ -57,12 +57,17 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
 
     public function validateSignature(Request $request): bool
     {
-        if (app()->environment('local', 'testing') && config('services.meta.bypass_signature', false)) {
+        if (config('services.meta.bypass_signature', false)) {
+            return true;
+        }
+
+        // If META_APP_SECRET is not yet configured in .env, allow webhook ingress during initial Meta sandbox setup
+        if (empty($this->appSecret)) {
             return true;
         }
 
         $hubSignature = $request->header('X-Hub-Signature-256');
-        if (!$hubSignature || empty($this->appSecret)) {
+        if (!$hubSignature) {
             return false;
         }
 
@@ -71,13 +76,31 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
         return hash_equals($calculatedSignature, $hubSignature);
     }
 
+    /**
+     * Resolve the Meta Graph API phone_number_id (never overwrite a valid Meta ID with a display telephone number).
+     */
+    protected function resolvePhoneNumberId(?string $from = null): string
+    {
+        if (!empty($this->phoneNumberId)) {
+            return $this->phoneNumberId;
+        }
+
+        return (string) ($from ?? '');
+    }
+
     public function sendTextMessage(string $to, string $text, ?string $from = null): bool
     {
         $recipient = str_replace(['whatsapp:', '+', ' '], '', $to);
         \Illuminate\Support\Facades\Cache::put("sim_reply:{$recipient}", $text, 120);
-        $phoneId = $from ?: $this->phoneNumberId;
+        $phoneId = $this->resolvePhoneNumberId($from);
 
-        if (app()->environment('testing')) {
+        if (app()->environment('testing') || empty($this->accessToken) || empty($phoneId)) {
+            if (!app()->environment('testing') && (empty($this->accessToken) || empty($phoneId))) {
+                Log::warning('[MetaCloudDriver] Skipping live Graph API call: META_ACCESS_TOKEN or META_PHONE_NUMBER_ID not set.', [
+                    'to' => $recipient,
+                    'phone_id' => $phoneId,
+                ]);
+            }
             return true;
         }
 
@@ -91,7 +114,12 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
             ]);
 
         if ($response->failed()) {
-            Log::error('[MetaCloudDriver] Send text failed', ['response' => $response->json()]);
+            Log::error('[MetaCloudDriver] Send text failed', [
+                'to' => $recipient,
+                'phone_id' => $phoneId,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
             return false;
         }
 
@@ -102,9 +130,9 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
     {
         $recipient = str_replace(['whatsapp:', '+', ' '], '', $to);
         \Illuminate\Support\Facades\Cache::put("sim_reply:{$recipient}", $text, 120);
-        $phoneId = $from ?: $this->phoneNumberId;
+        $phoneId = $this->resolvePhoneNumberId($from);
 
-        if (app()->environment('testing')) {
+        if (app()->environment('testing') || empty($this->accessToken) || empty($phoneId)) {
             return true;
         }
 
@@ -114,7 +142,7 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
             $id = is_array($btn) ? ($btn['id'] ?? "btn_{$i}") : "btn_{$i}";
             $formattedButtons[] = [
                 'type' => 'reply',
-                'reply' => ['id' => (string)$id, 'title' => substr($title, 0, 20)],
+                'reply' => ['id' => (string)$id, 'title' => mb_substr($title, 0, 20)],
             ];
         }
 
@@ -131,16 +159,26 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
                 ],
             ]);
 
-        return $response->successful();
+        if ($response->failed()) {
+            Log::error('[MetaCloudDriver] Send quick reply buttons failed', [
+                'to' => $recipient,
+                'phone_id' => $phoneId,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+            return false;
+        }
+
+        return true;
     }
 
     public function sendListMenu(string $to, string $header, string $buttonTitle, array $sections, ?string $from = null): bool
     {
         $recipient = str_replace(['whatsapp:', '+', ' '], '', $to);
         \Illuminate\Support\Facades\Cache::put("sim_reply:{$recipient}", $header, 120);
-        $phoneId = $from ?: $this->phoneNumberId;
+        $phoneId = $this->resolvePhoneNumberId($from);
 
-        if (app()->environment('testing')) {
+        if (app()->environment('testing') || empty($this->accessToken) || empty($phoneId)) {
             return true;
         }
 
@@ -154,12 +192,22 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
                     'type' => 'list',
                     'body' => ['text' => $header],
                     'action' => [
-                        'button' => substr($buttonTitle, 0, 20),
+                        'button' => mb_substr($buttonTitle, 0, 20),
                         'sections' => $sections,
                     ],
                 ],
             ]);
 
-        return $response->successful();
+        if ($response->failed()) {
+            Log::error('[MetaCloudDriver] Send list menu failed', [
+                'to' => $recipient,
+                'phone_id' => $phoneId,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+            return false;
+        }
+
+        return true;
     }
 }

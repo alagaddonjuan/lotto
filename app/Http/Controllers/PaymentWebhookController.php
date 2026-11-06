@@ -19,6 +19,22 @@ class PaymentWebhookController extends Controller
     {
         Log::info('[PaymentWebhook] Ingress payload received', $request->all());
 
+        // Optional HMAC Signature Verification when PAYMENT_WEBHOOK_SECRET / PAYSTACK_SECRET_KEY is configured
+        $secretKey = env('PAYMENT_WEBHOOK_SECRET') ?: env('PAYSTACK_SECRET_KEY');
+        if (!empty($secretKey) && !app()->environment('testing')) {
+            $signature = $request->header('X-Paystack-Signature')
+                ?? $request->header('monnify-signature')
+                ?? $request->header('verif-hash');
+
+            if ($signature) {
+                $expected = hash_hmac('sha512', $request->getContent(), $secretKey);
+                if (!hash_equals($expected, $signature) && $signature !== $secretKey) {
+                    Log::warning('[PaymentWebhook] Signature verification failed.');
+                    return response()->json(['status' => 'invalid_signature'], 401);
+                }
+            }
+        }
+
         $provider = strtolower($request->header('X-Payment-Provider', 'paystack'));
         if ($request->has('event_type') || $request->has('responseCode')) {
             $provider = 'monnify';

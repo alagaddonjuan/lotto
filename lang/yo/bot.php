@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'welcome_header' => "🎰 *Ẹ kú àbọ̀ sí :tenant!* 👋\nIlé iṣẹ́ lọtirí tó dájú jùlọ ní Nàìjíríà.\n\nÌsanwó lẹ́sẹ̀kẹsẹ̀ sí àkántì rẹ àti ayò ojoojúmọ́ lábẹ́ *Ghana 5/90* àti *Keno 20/80*!",
+    'welcome_header' => "🎰 *Ẹ kú àbọ̀ sí :tenant!* 👋\nIlé iṣẹ́ lọtirí tó dájú jùlọ ní Nàìjíríà.\n\nÌsanwó lẹ́sẹ̀kẹsẹ̀ sí àkántì rẹ àti ayò ojoojúmọ́ lábẹ́ *5/90 Direct*, *Fast 3*, àti *Keno 20/80*!",
     'ask_name' => "👉 *Kí ni orúkọ àkọ́kọ́ rẹ tàbí orúkọ ìnagijẹ rẹ?*",
     'invalid_name' => "👋 Jọ̀wọ́ sọ orúkọ rẹ tàbí orúkọ ìnagijẹ rẹ (fún àpẹẹrẹ *Michael*):",
     'welcome_name' => "Inú wa dùn láti gbà ọ́, *:name*! 🎉\n\n🔐 Yan *kóòdù PIN mẹ́rin (4-digit PIN)* bíi *5829* láti dáàbò bo owó rẹ nígbà tí o bá fẹ́ gba owó jáde:\n_(A kì yóò béèrè PIN yìí rárá nígbà tí o bá ń ta tẹ́tẹ́)_",

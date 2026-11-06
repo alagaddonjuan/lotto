@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'welcome_header' => "🎰 *Barka da zuwa :tenant!* 👋\nBabban dandalin caca mai inganci a Najeriya.\n\nBiyan kuɗi kai tsaye zuwa asusun banki da wasannin yau da kullum a cikin *Ghana 5/90* da *Keno 20/80*!",
+    'welcome_header' => "🎰 *Barka da zuwa :tenant!* 👋\nBabban dandalin caca mai inganci a Najeriya.\n\nBiyan kuɗi kai tsaye zuwa asusun banki da wasannin yau da kullum a cikin *5/90 Direct*, *Fast 3*, da *Keno 20/80*!",
     'ask_name' => "👉 *Menene sunanka na farko ko lakabi?*",
     'invalid_name' => "👋 Don Allah rubuta sunanka ko lakabinka (misali *Michael*):",
     'welcome_name' => "Muna farin cikin kasancewa da kai, *:name*! 🎉\n\n🔐 Zaɓi *lambar sirri mai lambobi 4 (PIN)* kamar *5829* don kare cire kuɗinka daga asusunka:\n_(Ba za a taɓa tambayarka wannan PIN ɗin ba lokacin da kake yin caca)_",

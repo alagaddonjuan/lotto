@@ -52,8 +52,10 @@ Route::middleware(['auth', 'two-factor.mandatory'])->group(function () {
     Route::post('/dashboard/invitations', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'invite'])->name('dashboard.invitations.create');
     Route::post('/dashboard/invite-rep', [\App\Http\Controllers\Auth\OperatorInviteController::class, 'invite'])->name('dashboard.invite-rep');
 
-    // Management Actions
+    // Management Actions & Meta Cloud API Gateway Configuration
     Route::post('/dashboard/create-tenant', [DashboardController::class, 'createTenant'])->name('dashboard.create-tenant');
+    Route::post('/dashboard/meta-settings', [DashboardController::class, 'updateMetaSettings'])->name('dashboard.meta-settings');
+    Route::post('/dashboard/meta-test-message', [DashboardController::class, 'sendTestWhatsAppMessage'])->name('dashboard.meta-test-message');
 
     // Draw Lifecycle & Maker-Checker Operations
     Route::get('/dashboard/draws', [\App\Http\Controllers\Dashboard\DrawManagementController::class, 'index'])->name('dashboard.draws.index');

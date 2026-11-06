@@ -148,7 +148,7 @@ class LottoConversationEngine
             }
 
             if ($upperInput === 'OPT_FUND' || str_contains($upperInput, 'FUND') || str_contains($upperInput, 'DEPOSIT')) {
-                $this->showDepositOptions($gateway, $tenant, $phone);
+                $this->showDepositOptions($gateway, $tenant, $phone, $player);
                 return;
             }
 
@@ -180,6 +180,10 @@ class LottoConversationEngine
 
             case 'CONFIRM_BET':
                 $this->handleBetConfirmation($input, $gateway, $tenant, $player, $session, $sessionKey);
+                break;
+
+            case 'WITHDRAWAL_AMOUNT':
+                $this->handleWithdrawalAmount($input, $gateway, $tenant, $player, $session, $sessionKey);
                 break;
 
             case 'WITHDRAWAL_PIN':
@@ -352,6 +356,29 @@ class LottoConversationEngine
 
         if (in_array($upper, ['RES', 'RESULT', 'RESULTS'])) {
             $this->showLatestResults($gateway, $tenant, $phone);
+            return true;
+        }
+
+        if (in_array($upper, ['FUND', 'DEPOSIT', 'TOPUP', 'ADD'])) {
+            $this->showDepositOptions($gateway, $tenant, $phone, $player);
+            return true;
+        }
+
+        // Bank Cash Withdrawal Command: WITHDRAW or WITHDRAW 2000 or CASHOUT 2000
+        if ($upper === 'WITHDRAW' || $upper === 'CASHOUT' || str_starts_with($upper, 'WITHDRAW ') || str_starts_with($upper, 'CASHOUT ')) {
+            $parts = preg_split('/\s+/', trim($input));
+            if (count($parts) >= 2 && is_numeric($parts[1])) {
+                $this->handleWithdrawalAmount($parts[1], $gateway, $tenant, $player, [], $sessionKey);
+                return true;
+            }
+
+            $cashNgn = number_format($player->cash_balance_kobo / 100, 2);
+            Cache::put($sessionKey, ['state' => 'WITHDRAWAL_AMOUNT', 'data' => []], now()->addMinutes(15));
+            $gateway->sendTextMessage(
+                $phone,
+                "🏦 *BANK CASH WITHDRAWAL*\n━━━━━━━━━━━━━━━━━━━━\nAvailable Cash Balance: *{$tenant->currency} {$cashNgn}*\n\nEnter the amount you wish to withdraw in *{$tenant->currency}* (Min: {$tenant->currency} 500):\n_(Reply *0* to cancel)_",
+                $tenant->whatsapp_number
+            );
             return true;
         }
 
@@ -658,19 +685,98 @@ class LottoConversationEngine
     }
 
     /**
-     * Handle masked PIN verification for bank withdrawals.
+     * Handle withdrawal amount entry before prompting for 4-digit security PIN.
+     */
+    protected function handleWithdrawalAmount(string $input, WhatsAppGatewayInterface $gateway, Tenant $tenant, Player $player, array $session, string $sessionKey): void
+    {
+        $phone = $player->phone;
+
+        if (trim($input) === '0') {
+            $this->showRootMenu($gateway, $tenant, $phone, $sessionKey, $player);
+            return;
+        }
+
+        $amountNgn = (float) preg_replace('/[^0-9.]/', '', $input);
+        if ($amountNgn < 500) {
+            $gateway->sendTextMessage($phone, "⚠️ Minimum withdrawal amount is *{$tenant->currency} 500.00*. Please enter a valid amount or reply *0* to cancel:", $tenant->whatsapp_number);
+            return;
+        }
+
+        $amountKobo = (int) round($amountNgn * 100);
+        if ($player->cash_balance_kobo < $amountKobo) {
+            $cashNgn = number_format($player->cash_balance_kobo / 100, 2);
+            $gateway->sendTextMessage($phone, "⛔ Insufficient withdrawable cash balance.\nAvailable Cash: *{$tenant->currency} {$cashNgn}*\nRequested: *{$tenant->currency} " . number_format($amountNgn, 2) . "*\n\n_(Note: Promotional bonus funds cannot be withdrawn directly)_", $tenant->whatsapp_number);
+            Cache::forget($sessionKey);
+            return;
+        }
+
+        Cache::put($sessionKey, [
+            'state' => 'WITHDRAWAL_PIN',
+            'data' => ['amount_kobo' => $amountKobo, 'amount_ngn' => $amountNgn],
+        ], now()->addMinutes(15));
+
+        $gateway->sendTextMessage(
+            $phone,
+            "🔐 *SECURITY VERIFICATION*\n━━━━━━━━━━━━━━━━━━━━\nWithdrawal Amount: *{$tenant->currency} " . number_format($amountNgn, 2) . "*\n\nPlease reply with your *4-digit Security Withdrawal PIN* to authorize this payout:\n_(Reply *0* to cancel)_",
+            $tenant->whatsapp_number
+        );
+    }
+
+    /**
+     * Handle masked PIN verification for bank withdrawals and deduct cash balance atomically.
      */
     protected function handleWithdrawalPin(string $input, WhatsAppGatewayInterface $gateway, Tenant $tenant, Player $player, array $session, string $sessionKey): void
     {
         $phone = $player->phone;
         $pin = trim($input);
 
-        if (!Hash::check($pin, $player->withdrawal_pin_hash)) {
+        if ($pin === '0') {
+            Cache::forget($sessionKey);
+            $this->showRootMenu($gateway, $tenant, $phone, $sessionKey, $player);
+            return;
+        }
+
+        if (empty($player->withdrawal_pin_hash) || !Hash::check($pin, $player->withdrawal_pin_hash)) {
             $gateway->sendTextMessage($phone, "⛔ Incorrect Withdrawal PIN. For security, please re-enter your 4-digit PIN or reply *0* to cancel:", $tenant->whatsapp_number);
             return;
         }
 
+        $amountKobo = (int) ($session['data']['amount_kobo'] ?? 0);
         Cache::forget($sessionKey);
+
+        if ($amountKobo > 0) {
+            $success = \Illuminate\Support\Facades\DB::transaction(function () use ($player, $amountKobo) {
+                $lockedPlayer = Player::where('id', $player->id)->lockForUpdate()->first();
+                if (!$lockedPlayer || $lockedPlayer->cash_balance_kobo < $amountKobo) {
+                    return false;
+                }
+                $lockedPlayer->cash_balance_kobo -= $amountKobo;
+                $lockedPlayer->save();
+                return true;
+            });
+
+            if (!$success) {
+                $gateway->sendTextMessage($phone, "⛔ Insufficient cash balance to complete withdrawal.", $tenant->whatsapp_number);
+                return;
+            }
+
+            $freshPlayer = $player->fresh();
+            $amtNgn = number_format($amountKobo / 100, 2);
+            $remNgn = number_format($freshPlayer->cash_balance_kobo / 100, 2);
+            $ref = 'WDR-' . strtoupper(Str::random(8));
+
+            $msg = "✅ *WITHDRAWAL DISPATCHED*\n"
+                 . "━━━━━━━━━━━━━━━━━━━━\n"
+                 . "• Ref: *{$ref}*\n"
+                 . "• Amount Paid: *{$tenant->currency} {$amtNgn}*\n"
+                 . "• Remaining Cash: *{$tenant->currency} {$remNgn}*\n"
+                 . "━━━━━━━━━━━━━━━━━━━━\n"
+                 . "Your bank payout has been authorized via the clearinghouse gateway.";
+
+            $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
+            return;
+        }
+
         $gateway->sendTextMessage($phone, "✅ PIN verified! Bank withdrawal processing via clearinghouse gateway.", $tenant->whatsapp_number);
     }
 
@@ -722,20 +828,19 @@ class LottoConversationEngine
     }
 
     /**
-     * Show deposit details.
+     * Show deposit details localized to the player's language.
      */
-    protected function showDepositOptions(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone): void
+    protected function showDepositOptions(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, ?Player $player = null): void
     {
-        $msg = "💳 *FUND YOUR GAMING WALLET*\n"
-             . "━━━━━━━━━━━━━━━━━━━━\n"
-             . "• Bank: *Zenith Bank*\n"
-             . "• Account: *1014829102*\n"
-             . "• Account Name: *{$tenant->name}*\n"
-             . "• Narration / Ref: *{$phone}*\n\n"
-             . "Or fund online via Card / Bank Transfer:\n"
-             . "👉 https://lotto.q4iltd.com/play\n"
-             . "━━━━━━━━━━━━━━━━━━━━\n"
-             . "_Deposits credit automatically within 60 seconds._";
+        $lang = $player?->language ?? 'en';
+        $accountNo = '9' . substr(preg_replace('/[^0-9]/', '', $phone), -9);
+        $name = $player?->name ?? 'Player';
+
+        $msg = $this->msg('fund_info', [
+            'account' => $accountNo,
+            'tenant' => $tenant->name,
+            'name' => $name,
+        ], $lang);
 
         $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
     }

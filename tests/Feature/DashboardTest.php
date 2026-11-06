@@ -133,4 +133,31 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
     }
+
+    public function test_admin_can_configure_meta_cloud_api_settings_and_send_test_message(): void
+    {
+        $tenant = Tenant::first();
+
+        $saveRes = $this->actingAs($this->adminUser)->post('/dashboard/meta-settings', [
+            'tenant_id' => $tenant->id,
+            'whatsapp_number' => '15550199999',
+            'phone_number_id' => '109876543210123',
+            'access_token' => 'EAAG_TEST_META_TOKEN_12345',
+            'verify_token' => 'q4i_custom_verify_token',
+        ]);
+
+        $saveRes->assertRedirect();
+        $tenant->refresh();
+        $this->assertEquals('15550199999', $tenant->whatsapp_number);
+        $this->assertEquals('109876543210123', $tenant->driver_config['phone_number_id']);
+        $this->assertEquals('q4i_custom_verify_token', $tenant->driver_config['verify_token']);
+
+        $testMsgRes = $this->actingAs($this->adminUser)->post('/dashboard/meta-test-message', [
+            'tenant_id' => $tenant->id,
+            'recipient_phone' => '08031234567',
+        ]);
+
+        $testMsgRes->assertRedirect();
+        $testMsgRes->assertSessionHas('success');
+    }
 }

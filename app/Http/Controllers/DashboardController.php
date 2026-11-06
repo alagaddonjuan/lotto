@@ -195,4 +195,78 @@ class DashboardController extends Controller
 
         return back()->with('success', "Operator representative {$validated['email']} created with 2FA enabled!");
     }
+
+    /**
+     * Update Meta Cloud API WhatsApp Gateway credentials for a tenant directly from the Dashboard UI.
+     */
+    public function updateMetaSettings(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'exists:tenants,id'],
+            'whatsapp_number' => ['required', 'string', 'max:30'],
+            'phone_number_id' => ['nullable', 'string', 'max:64'],
+            'access_token' => ['nullable', 'string', 'max:1024'],
+            'app_secret' => ['nullable', 'string', 'max:255'],
+            'verify_token' => ['nullable', 'string', 'max:128'],
+        ]);
+
+        $tenant = Tenant::findOrFail($validated['tenant_id']);
+        $config = is_array($tenant->driver_config) ? $tenant->driver_config : [];
+
+        if (!empty($validated['phone_number_id'])) {
+            $config['phone_number_id'] = trim($validated['phone_number_id']);
+        }
+        if (!empty($validated['access_token'])) {
+            $config['access_token'] = trim($validated['access_token']);
+        }
+        if (!empty($validated['app_secret'])) {
+            $config['app_secret'] = trim($validated['app_secret']);
+        }
+        if (!empty($validated['verify_token'])) {
+            $config['verify_token'] = trim($validated['verify_token']);
+        }
+
+        $cleanPhone = preg_replace('/[^0-9]/', '', $validated['whatsapp_number']);
+
+        $tenant->update([
+            'whatsapp_number' => $cleanPhone ?: $validated['whatsapp_number'],
+            'whatsapp_driver' => 'meta',
+            'driver_config' => $config,
+        ]);
+
+        return redirect()->route('dashboard', ['tenant_id' => $tenant->id, 'tab' => 'meta'])
+            ->with('success', "Meta Cloud API WhatsApp credentials saved for {$tenant->name}!");
+    }
+
+    /**
+     * Dispatch a live test WhatsApp message via Meta Cloud API to verify connectivity.
+     */
+    public function sendTestWhatsAppMessage(Request $request, \App\Services\WhatsApp\WhatsAppManager $whatsAppManager): RedirectResponse
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'exists:tenants,id'],
+            'recipient_phone' => ['required', 'string', 'min:10', 'max:20'],
+            'test_message' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $tenant = Tenant::findOrFail($validated['tenant_id']);
+        $recipient = preg_replace('/[^0-9]/', '', $validated['recipient_phone']);
+        if (str_starts_with($recipient, '0')) {
+            $recipient = '234' . substr($recipient, 1);
+        }
+
+        $body = ($validated['test_message'] ?? null)
+            ?: "✅ *Q4I Clearinghouse Live Test*\nMeta Cloud API v20.0 connection for *{$tenant->name}* is active! Reply *HI* or *PLAY* to test the conversational bot.";
+
+        $driver = $whatsAppManager->driver($tenant);
+        $sent = $driver->sendTextMessage($recipient, $body, $tenant->whatsapp_number);
+
+        if ($sent) {
+            return redirect()->route('dashboard', ['tenant_id' => $tenant->id, 'tab' => 'meta'])
+                ->with('success', "Test WhatsApp message dispatched to +{$recipient}! Check your WhatsApp (or storage/logs/laravel.log if token is not yet live).");
+        }
+
+        return redirect()->route('dashboard', ['tenant_id' => $tenant->id, 'tab' => 'meta'])
+            ->withErrors(['meta' => "Meta Graph API rejected the test message to +{$recipient}. Verify your Phone Number ID, Access Token, and that +{$recipient} is added as a test recipient in Meta Developer Console."]);
+    }
 }

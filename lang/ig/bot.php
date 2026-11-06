@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'welcome_header' => "🎰 *Nnọọ na :tenant!* 👋\nỤlọ ọrụ lọterị kachasị nwee ntụkwasị obi na Naijiria.\n\nỊkwụ ụgwọ ozugbo na akaụntụ ụlọ akụ gị na egwuregwu kwa ụbọchị na *Ghana 5/90* na *Keno 20/80*!",
+    'welcome_header' => "🎰 *Nnọọ na :tenant!* 👋\nỤlọ ọrụ lọterị kachasị nwee ntụkwasị obi na Naijiria.\n\nỊkwụ ụgwọ ozugbo na akaụntụ ụlọ akụ gị na egwuregwu kwa ụbọchị na *5/90 Direct*, *Fast 3*, na *Keno 20/80*!",
     'ask_name' => "👉 *Kedu aha mbụ gị ma ọ bụ aha otutu gị?*",
     'invalid_name' => "👋 Biko ziga aha mbụ gị ma ọ bụ aha otutu gị (dịka *Michael*):",
     'welcome_name' => "Obi dị anyị ụtọ ịnara gị, *:name*! 🎉\n\n🔐 Họrọ *PIN nchekwa nwere ọnụọgụ 4* dịka *5829* iji chebe mwepụ ego gị n'ụlọ akụ:\n_(A gaghị ajụ gị PIN a mgbe ị na-agba chaa chaa)_",

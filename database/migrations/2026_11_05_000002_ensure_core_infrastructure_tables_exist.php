@@ -56,3 +56,4 @@ return new class extends Migration
         // Safe no-op to avoid dropping production infrastructure tables
     }
 };
+

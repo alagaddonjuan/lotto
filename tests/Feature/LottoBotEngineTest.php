@@ -220,4 +220,28 @@ class LottoBotEngineTest extends TestCase
         $player->refresh();
         $this->assertEquals('yo', $player->language);
     }
+
+    public function test_whatsapp_cash_withdrawal_with_pin_verification(): void
+    {
+        $playerPhone = '2348066554433';
+
+        $player = Player::create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => $playerPhone,
+            'name' => 'Adebayo',
+            'cash_balance_kobo' => 500000, // ₦5,000.00
+            'withdrawal_pin_hash' => \Illuminate\Support\Facades\Hash::make('5829'),
+        ]);
+
+        // Step 1: Request withdrawal of ₦2,000
+        $res1 = $this->sendMetaMessage($playerPhone, 'WITHDRAW 2000');
+        $res1->assertStatus(200);
+
+        // Step 2: Authorize with 4-digit PIN "5829"
+        $res2 = $this->sendMetaMessage($playerPhone, '5829');
+        $res2->assertStatus(200);
+
+        $player->refresh();
+        $this->assertEquals(300000, $player->cash_balance_kobo, '₦2,000 (200,000 Kobo) deducted after PIN verification');
+    }
 }

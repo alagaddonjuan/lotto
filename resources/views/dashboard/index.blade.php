@@ -98,6 +98,14 @@
                                 <span>Staff Invitations &amp; Access</span>
                             </span>
                         </button>
+
+                        <button onclick="switchTab('meta')" id="side-btn-meta" class="sidebar-link w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition hover:bg-white/10">
+                            <span class="flex items-center gap-3">
+                                <i class="fa-brands fa-whatsapp w-4 text-center text-emerald-400"></i>
+                                <span>Meta WhatsApp Gateway</span>
+                            </span>
+                            <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[9px] px-1.5 py-0.5 rounded font-mono">API</span>
+                        </button>
                     </div>
                 </div>
 
@@ -266,6 +274,10 @@
                     <i class="fa-solid fa-user-shield text-indigo-600"></i>
                     <span>Staff Invitations &amp; Access</span>
                 </button>
+                <button onclick="switchTab('meta')" id="tab-btn-meta" class="top-tab px-3 py-3.5 border-b-2 border-transparent hover:text-slate-900 transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-brands fa-whatsapp text-emerald-600"></i>
+                    <span>Meta WhatsApp Gateway</span>
+                </button>
             </div>
         </div>
 
@@ -276,6 +288,13 @@
                 <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
                     <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
                     <span>{{ session('success') }}</span>
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-600 text-sm"></i>
+                    <span>{{ $errors->first() }}</span>
                 </div>
             @endif
 
@@ -872,6 +891,182 @@
                 </div>
             </div>
 
+            <!-- ========================================== -->
+            <!-- TAB 6: META WHATSAPP CLOUD API & OPERATORS -->
+            <!-- ========================================== -->
+            <div id="tab-content-meta" class="tab-pane hidden space-y-6">
+
+                <!-- Webhook Endpoints Reference Bar -->
+                <div class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
+                    <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
+                        <div>
+                            <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2">
+                                <i class="fa-brands fa-meta text-[#1d5ba6] text-base"></i>
+                                Meta Developer Console Webhook Configuration
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                Copy these values into your Meta App Dashboard under <strong>WhatsApp &rarr; Configuration &rarr; Webhook</strong> and subscribe to the <code class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-800">messages</code> field.
+                            </p>
+                        </div>
+                        <a href="{{ route('play.portal') }}" target="_blank" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition">
+                            <i class="fa-brands fa-whatsapp"></i>
+                            <span>Open Web Bot Simulator</span>
+                        </a>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <label class="block text-[10px] font-mono uppercase font-bold text-slate-500 mb-1">Callback URL (HTTPS)</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" readonly id="metaCallbackUrl" value="{{ url('/api/webhook/meta') }}" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-900">
+                                <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('metaCallbackUrl').value); alert('Webhook Callback URL copied!');" class="px-3 py-2 bg-[#1d5ba6] hover:bg-[#154682] text-white text-xs font-bold rounded-lg shrink-0">
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <label class="block text-[10px] font-mono uppercase font-bold text-slate-500 mb-1">Verify Token</label>
+                            <div class="flex items-center gap-2">
+                                <input type="text" readonly id="metaVerifyToken" value="{{ $tenant->driver_config['verify_token'] ?? config('services.meta.verify_token', 'q4i_lotto_meta_secret') }}" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-900">
+                                <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('metaVerifyToken').value); alert('Verify Token copied!');" class="px-3 py-2 bg-[#1d5ba6] hover:bg-[#154682] text-white text-xs font-bold rounded-lg shrink-0">
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Credentials Form & Live Connection Tester -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    <!-- Left: Meta Cloud API Credentials Form (7 cols) -->
+                    <div class="lg:col-span-7 bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
+                        <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2 mb-1">
+                            <i class="fa-solid fa-key text-[#1d5ba6]"></i>
+                            Operator WhatsApp Cloud API Credentials ({{ $tenant->name }})
+                        </h3>
+                        <p class="text-xs text-slate-500 mb-5">
+                            Bind Meta's test number or verified production number directly to this operator node.
+                        </p>
+
+                        <form method="POST" action="{{ route('dashboard.meta-settings') }}" class="space-y-4">
+                            @csrf
+                            <input type="hidden" name="tenant_id" value="{{ $tenant->id }}">
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">WhatsApp Bot Phone Number</label>
+                                    <input type="text" name="whatsapp_number" required value="{{ $tenant->whatsapp_number }}" placeholder="e.g. 15550192837 or 2348000000000" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:border-[#1d5ba6] focus:outline-none">
+                                    <span class="text-[10px] text-slate-400">Digits only (no + sign)</span>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Meta Phone Number ID</label>
+                                    <input type="text" name="phone_number_id" value="{{ $tenant->driver_config['phone_number_id'] ?? config('services.meta.phone_number_id') }}" placeholder="e.g. 105928374657382" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:border-[#1d5ba6] focus:outline-none">
+                                    <span class="text-[10px] text-slate-400">15-digit ID from Meta API Setup page</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Meta Graph API Access Token (System User / Temp Token)</label>
+                                <input type="password" name="access_token" value="{{ $tenant->driver_config['access_token'] ?? config('services.meta.access_token') }}" placeholder="EAAGm0PX4ZCpsBA..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:border-[#1d5ba6] focus:outline-none">
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Meta App Secret (Optional during sandbox test)</label>
+                                    <input type="password" name="app_secret" value="{{ $tenant->driver_config['app_secret'] ?? config('services.meta.app_secret') }}" placeholder="For X-Hub-Signature-256 verification" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:border-[#1d5ba6] focus:outline-none">
+                                </div>
+
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Webhook Verify Token</label>
+                                    <input type="text" name="verify_token" value="{{ $tenant->driver_config['verify_token'] ?? config('services.meta.verify_token', 'q4i_lotto_meta_secret') }}" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:border-[#1d5ba6] focus:outline-none">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full py-3 px-4 rounded-xl bg-[#1d5ba6] hover:bg-[#154682] font-bold text-xs text-white transition flex items-center justify-center gap-2 shadow-md shadow-[#1d5ba6]/20">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Save Meta Cloud API Configuration</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Right: Live Outbound WhatsApp Ping & Onboard New Operator (5 cols) -->
+                    <div class="lg:col-span-5 space-y-6">
+
+                        <!-- Send Test WhatsApp Message Card -->
+                        <div class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
+                            <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2 mb-1">
+                                <i class="fa-brands fa-whatsapp text-emerald-600 text-base"></i>
+                                Send Live Test WhatsApp Message
+                            </h3>
+                            <p class="text-xs text-slate-500 mb-4">
+                                Verify outbound Graph API v20.0 delivery to your personal WhatsApp number.
+                            </p>
+
+                            <form method="POST" action="{{ route('dashboard.meta-test-message') }}" class="space-y-3.5">
+                                @csrf
+                                <input type="hidden" name="tenant_id" value="{{ $tenant->id }}">
+
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Recipient WhatsApp Phone</label>
+                                    <input type="text" name="recipient_phone" required placeholder="e.g. 2348031234567" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-900 focus:bg-white focus:border-[#1d5ba6] focus:outline-none">
+                                </div>
+
+                                <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs text-white transition flex items-center justify-center gap-2 shadow-sm">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                    <span>Dispatch Live WhatsApp Test</span>
+                                </button>
+                            </form>
+                        </div>
+
+                        @if(auth()->check() && auth()->user()->isSuperAdmin())
+                            <!-- Onboard New Operator Node Card -->
+                            <div class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
+                                <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2 mb-1">
+                                    <i class="fa-solid fa-building-circle-arrow-right text-[#1d5ba6]"></i>
+                                    Onboard New Lottery Operator Node
+                                </h3>
+                                <p class="text-xs text-slate-500 mb-4">
+                                    Provision an isolated multi-tenant operator ledger with custom commercial splits.
+                                </p>
+
+                                <form method="POST" action="{{ route('dashboard.create-tenant') }}" class="space-y-3">
+                                    @csrf
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Operator Legal Name</label>
+                                        <input type="text" name="name" required placeholder="e.g. Premier Lotto Nigeria" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-900">
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Country</label>
+                                            <input type="text" name="country_code" value="NG" maxlength="2" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Currency</label>
+                                            <input type="text" name="currency" value="NGN" maxlength="3" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Q4I %</label>
+                                            <input type="number" name="q4i_split_percent" value="35" min="5" max="50" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Dedicated WhatsApp Number</label>
+                                        <input type="text" name="whatsapp_number" required placeholder="e.g. 2348090000000" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-900">
+                                    </div>
+                                    <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 font-bold text-xs text-white transition">
+                                        Provision Operator Node
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+
+                    </div>
+                </div>
+            </div>
+
         </main>
 
         <footer class="border-t border-slate-200 bg-white py-4 px-6 text-center text-xs text-slate-500 font-mono">
@@ -898,6 +1093,12 @@
             if (topBtn) topBtn.classList.add('active');
             if (sideBtn) sideBtn.classList.add('active');
         }
+
+        @if(!empty($currentTab) && $currentTab !== 'overview')
+            document.addEventListener('DOMContentLoaded', function() {
+                switchTab('{{ $currentTab }}');
+            });
+        @endif
     </script>
 </body>
 </html>

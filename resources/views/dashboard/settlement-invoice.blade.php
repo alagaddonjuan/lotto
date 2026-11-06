@@ -14,23 +14,23 @@
         }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen py-10 px-4 sm:px-8">
+<body class="bg-slate-100 text-slate-900 min-h-screen py-10 px-4 sm:px-8">
 
     <div class="max-w-4xl mx-auto">
 
         <!-- Top Action Bar (No Print) -->
         <div class="no-print flex justify-between items-center mb-6">
-            <a href="{{ route('dashboard') }}" class="text-xs font-semibold text-slate-400 hover:text-white transition flex items-center gap-2">
+            <a href="{{ route('dashboard') }}" class="text-xs font-bold text-slate-600 hover:text-[#1d5ba6] transition flex items-center gap-2">
                 <i class="fa-solid fa-arrow-left"></i>
                 <span>Back to Dashboard</span>
             </a>
 
             <div class="flex items-center gap-3">
-                <a href="{{ route('dashboard.export-csv', ['tenant_id' => $tenant->id]) }}" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition flex items-center gap-2">
-                    <i class="fa-solid fa-file-csv"></i>
+                <a href="{{ route('dashboard.export-csv', ['tenant_id' => $tenant->id]) }}" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-xs font-bold text-slate-700 transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-file-csv text-emerald-600"></i>
                     <span>Export CSV</span>
                 </a>
-                <button onclick="window.print()" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-500/20">
+                <button onclick="window.print()" class="px-5 py-2 rounded-xl bg-[#1d5ba6] hover:bg-[#154682] text-white font-bold text-xs transition flex items-center gap-2 shadow-md shadow-[#1d5ba6]/20">
                     <i class="fa-solid fa-print"></i>
                     <span>Print / Save PDF</span>
                 </button>
@@ -38,13 +38,13 @@
         </div>
 
         <!-- Official Statement Document Card -->
-        <div class="bg-white text-slate-900 rounded-3xl p-8 sm:p-12 shadow-2xl border border-slate-200">
+        <div class="bg-white text-slate-900 rounded-3xl p-8 sm:p-12 shadow-xl border border-slate-200">
 
             <!-- Header -->
             <div class="flex flex-wrap justify-between items-start border-b border-slate-200 pb-8 gap-6">
                 <div>
                     <div class="flex items-center gap-3 mb-2">
-                        <img src="https://q4iltd.com/color@6x.png" onerror="this.src='{{ asset('images/q4i-logo.png') }}'" alt="Q4I Limited" class="h-10 w-auto object-contain">
+                        <img src="{{ asset('images/q4i-logo.png') }}" onerror="this.src='https://q4iltd.com/color@6x.png'" alt="Q4I Limited" class="h-10 w-auto object-contain">
                         <h1 class="text-2xl font-black tracking-tight text-slate-950">Q4I LIMITED</h1>
                     </div>
                     <p class="text-xs text-slate-500">Lottery Technology Provider & Middleware Engine</p>
@@ -131,10 +131,10 @@
                                 {{ $tenant->currency }} {{ number_format($balanceSheet['splits']['q4i_accrued_earned'], 2) }}
                             </td>
                         </tr>
-                        <tr class="bg-purple-50 text-purple-900">
-                            <td class="py-3 px-4 font-bold">Modern Lottery Operator Net Share (65% of Stakes)</td>
-                            <td class="py-3 px-4 text-center font-bold">65.00%</td>
-                            <td class="py-3 px-4 text-right font-mono font-black text-purple-700 text-sm">
+                        <tr class="bg-indigo-50 text-indigo-900">
+                            <td class="py-3 px-4 font-bold">{{ $tenant->name }} Operator Net Share ({{ number_format($balanceSheet['splits']['operator_percentage'], 0) }}% of Stakes)</td>
+                            <td class="py-3 px-4 text-center font-bold">{{ number_format($balanceSheet['splits']['operator_percentage'], 2) }}%</td>
+                            <td class="py-3 px-4 text-right font-mono font-black text-indigo-700 text-sm">
                                 {{ $tenant->currency }} {{ number_format($balanceSheet['splits']['operator_accrued_pool'], 2) }}
                             </td>
                         </tr>
