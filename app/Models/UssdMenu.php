@@ -12,6 +12,7 @@ class UssdMenu extends Model
     use HasFactory;
 
     protected $fillable = [
+        'id',
         'tenant_id',
         'menu_name',
         'service_code',

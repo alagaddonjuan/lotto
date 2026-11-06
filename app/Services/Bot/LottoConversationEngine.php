@@ -139,31 +139,53 @@ class LottoConversationEngine
             return;
         }
 
+        // Global Interactive Button & List Replies (work from ANY state if user taps an earlier button)
+        $upperInput = strtoupper(trim($input));
+        if ($upperInput === 'OPT_PLAY') {
+            $this->showGamesMenu($gateway, $tenant, $phone, $sessionKey, $player);
+            return;
+        }
+        if ($upperInput === 'OPT_FUND') {
+            $this->showDepositOptions($gateway, $tenant, $phone, $player);
+            return;
+        }
+        if ($upperInput === 'OPT_RESULTS') {
+            $this->showLatestResults($gateway, $tenant, $phone, $player);
+            return;
+        }
+        if (in_array($upperInput, ['GAME_590', 'GAME_KENO', 'GAME_FAST3'])) {
+            $this->startGameSelection($upperInput, $gateway, $tenant, $player, $sessionKey);
+            return;
+        }
+
         // Top-Level Navigation Triggers (when at Root menu)
-        $upperInput = strtoupper($input);
         if (($session['state'] ?? 'ROOT_MENU') === 'ROOT_MENU') {
-            if ($upperInput === 'OPT_PLAY' || str_contains($upperInput, 'PLAY')) {
-                $this->showGamesMenu($gateway, $tenant, $phone, $sessionKey);
+            if (str_contains($upperInput, 'PLAY')) {
+                $this->showGamesMenu($gateway, $tenant, $phone, $sessionKey, $player);
                 return;
             }
 
-            if ($upperInput === 'OPT_FUND' || str_contains($upperInput, 'FUND') || str_contains($upperInput, 'DEPOSIT')) {
+            if (str_contains($upperInput, 'FUND') || str_contains($upperInput, 'DEPOSIT')) {
                 $this->showDepositOptions($gateway, $tenant, $phone, $player);
                 return;
             }
 
-            if ($upperInput === 'OPT_RESULTS' || str_contains($upperInput, 'RESULT')) {
-                $this->showLatestResults($gateway, $tenant, $phone);
+            if (str_contains($upperInput, 'RESULT')) {
+                $this->showLatestResults($gateway, $tenant, $phone, $player);
                 return;
             }
 
-            // Direct numeric trigger (e.g. 1 for Play Games in USSD mode)
-            if (ctype_digit($input)) {
+            // Direct numeric or chained USSD trigger (e.g. 1, 2, 2*2, 5*1 in USSD mode)
+            if (ctype_digit($input) || preg_match('/^\d+(\*\d+)+$/', $input)) {
                 if (empty($session['item_id'])) {
                     $menu = UssdMenu::where('tenant_id', $tenant->id)->where('is_active', true)->first();
                     $session['item_id'] = $menu?->rootItem()?->id ?? 112;
                 }
-                $this->handleUssdMenuNavigation($input, $gateway, $tenant, $player, $operator, $session, $sessionKey);
+                $steps = explode('*', $input);
+                foreach ($steps as $step) {
+                    $this->handleUssdMenuNavigation($step, $gateway, $tenant, $player, $operator, $session, $sessionKey);
+                    $session = Cache::get($sessionKey, ['state' => 'ROOT_MENU', 'item_id' => null, 'data' => []]);
+                }
                 return;
             }
         }
@@ -291,37 +313,40 @@ class LottoConversationEngine
 
     /**
      * Display Active Games via Native Interactive List Message (scrollable drawer).
+     * Section title strictly <= 24 chars per Meta Cloud API specification.
      */
-    protected function showGamesMenu(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, string $sessionKey): void
+    protected function showGamesMenu(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, string $sessionKey, ?Player $player = null): void
     {
+        $lang = $player?->language ?? 'en';
         $cutoff590 = now()->addHours(2)->format('H:i');
         $cutoffKeno = now()->addMinutes(15)->format('H:i');
 
         $sections = [
             [
-                'title' => 'Active Clearinghouse Games',
+                'title' => $this->msg('games_section_title', [], $lang),
                 'rows' => [
                     [
                         'id' => 'game_590',
                         'title' => 'Modern 5/90 Direct',
-                        'description' => "Min: NGN 100 | Cut-off: {$cutoff590} WAT",
+                        'description' => "Min: {$tenant->currency} 100 | Cut-off: {$cutoff590} WAT",
                     ],
                     [
                         'id' => 'game_keno',
                         'title' => 'Keno 20/80 (Instant)',
-                        'description' => "Min: NGN 50 | Live Draw: {$cutoffKeno}",
+                        'description' => "Min: {$tenant->currency} 50 | Live Draw: {$cutoffKeno}",
                     ],
                     [
                         'id' => 'game_fast3',
                         'title' => 'Fast 3 Jackpot',
-                        'description' => "Min: NGN 100 | Drawn Every 10 Mins",
+                        'description' => "Min: {$tenant->currency} 100 | Drawn Every 10 Mins",
                     ],
                 ],
             ],
         ];
 
-        $header = "🎯 *SELECT ACTIVE LOTTO GAME*\n\nChoose a game from the list to pick your winning numbers:";
-        $gateway->sendListMenu($phone, $header, 'View Games List', $sections, $tenant->whatsapp_number);
+        $header = $this->msg('games_menu_header', [], $lang);
+        $btnTitle = $this->msg('games_menu_btn', [], $lang);
+        $gateway->sendListMenu($phone, $header, $btnTitle, $sections, $tenant->whatsapp_number);
 
         Cache::put($sessionKey, [
             'state' => 'USSD_MENU',
@@ -331,11 +356,79 @@ class LottoConversationEngine
     }
 
     /**
+     * Start number selection for a specific game in the player's chosen language.
+     */
+    protected function startGameSelection(
+        string $gameIdentifier,
+        WhatsAppGatewayInterface $gateway,
+        Tenant $tenant,
+        Player $player,
+        string $sessionKey,
+        ?string $customTitle = null,
+        ?int $customPicks = null
+    ): void {
+        $lang = $player->language ?? 'en';
+        $upper = strtoupper(trim($gameIdentifier));
+
+        if (str_contains($upper, 'KENO') || $upper === 'GAME_KENO') {
+            $gameCode = 'KENO_20_80';
+            $gameTitle = $customTitle ?: 'Keno 20/80';
+            $pool = 80;
+            $picks = $customPicks ?: 10;
+            $minStake = 50;
+            $example = '5 12 28 34 45 52 61 70 75 80';
+        } elseif (str_contains($upper, 'FAST3') || str_contains($upper, 'FAST_3') || $upper === 'GAME_FAST3') {
+            $gameCode = 'FAST_3';
+            $gameTitle = $customTitle ?: 'Fast 3 Jackpot';
+            $pool = 90;
+            $picks = $customPicks ?: 3;
+            $minStake = 100;
+            $example = '7 14 21';
+        } else {
+            $gameCode = '5_90_DAILY';
+            $gameTitle = $customTitle ?: 'Modern 5/90 Direct';
+            $pool = 90;
+            $picks = $customPicks ?: 5;
+            $minStake = 100;
+            $examples = [
+                1 => '7',
+                2 => '7 14',
+                3 => '7 14 21',
+                4 => '7 14 21 35',
+                5 => '7 14 21 35 42',
+            ];
+            $example = $examples[$picks] ?? '7 14 21 35 42';
+        }
+
+        Cache::put($sessionKey, [
+            'state' => 'SELECT_NUMBERS',
+            'data' => [
+                'game_code' => $gameCode,
+                'game_title' => $gameTitle,
+                'pool' => $pool,
+                'picks' => $picks,
+                'min_stake' => $minStake,
+            ],
+        ], now()->addMinutes(15));
+
+        $msg = $this->msg('choose_numbers', [
+            'game' => $gameTitle,
+            'draw' => strtoupper(substr($gameCode, 0, 4)) . '-' . date('Hi'),
+            'count' => $picks,
+            'range' => $pool,
+            'example' => $example,
+        ], $lang);
+
+        $gateway->sendTextMessage($player->phone, $msg, $tenant->whatsapp_number);
+    }
+
+    /**
      * Handle fast shortcuts (e.g. BAL, RES, KENO QP 200, 590 QP 500) without PIN.
      */
     protected function handleShortcuts(string $input, WhatsAppGatewayInterface $gateway, Tenant $tenant, Player $player, string $sessionKey): bool
     {
         $phone = $player->phone;
+        $lang = $player->language ?? 'en';
         $upper = strtoupper(trim($input));
 
         if (in_array($upper, ['BAL', 'BALANCE', 'WALLET', 'WAL'])) {
@@ -343,19 +436,18 @@ class LottoConversationEngine
             $bonusNgn = number_format($player->bonus_balance_kobo / 100, 2);
             $totalNgn = number_format($player->totalBalanceKobo() / 100, 2);
 
-            $msg = "💼 *YOUR WALLET BALANCE*\n"
-                 . "━━━━━━━━━━━━━━━━━━━━\n"
-                 . "💵 Cash (Real Deposits): *{$tenant->currency} {$cashNgn}*\n"
-                 . "🎁 Promotional Bonus: *{$tenant->currency} {$bonusNgn}*\n"
-                 . "💰 Total Spendable: *{$tenant->currency} {$totalNgn}*\n"
-                 . "━━━━━━━━━━━━━━━━━━━━\n\n"
-                 . "Reply *1* to play games or *2* to deposit.";
+            $msg = $this->msg('wallet_balance_box', [
+                'currency' => $tenant->currency,
+                'cash' => $cashNgn,
+                'bonus' => $bonusNgn,
+                'total' => $totalNgn,
+            ], $lang);
             $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
             return true;
         }
 
         if (in_array($upper, ['RES', 'RESULT', 'RESULTS'])) {
-            $this->showLatestResults($gateway, $tenant, $phone);
+            $this->showLatestResults($gateway, $tenant, $phone, $player);
             return true;
         }
 
@@ -434,11 +526,12 @@ class LottoConversationEngine
     }
 
     /**
-     * Handle number picking stage.
+     * Handle number picking stage (localized in player's language).
      */
     protected function handleNumberSelection(string $input, WhatsAppGatewayInterface $gateway, Tenant $tenant, Player $player, array $session, string $sessionKey): void
     {
         $phone = $player->phone;
+        $lang = $player->language ?? 'en';
         $data = $session['data'] ?? [];
         $requiredPicks = $data['picks'] ?? 5;
         $maxPool = $data['pool'] ?? 90;
@@ -459,13 +552,13 @@ class LottoConversationEngine
             sort($selected);
 
             if (count($selected) !== $requiredPicks) {
-                $gateway->sendTextMessage($phone, "⚠️ Please provide exactly *{$requiredPicks}* distinct numbers (or reply *QP* for Quick Pick).", $tenant->whatsapp_number);
+                $gateway->sendTextMessage($phone, $this->msg('invalid_picks_count', ['count' => $requiredPicks], $lang), $tenant->whatsapp_number);
                 return;
             }
 
             foreach ($selected as $num) {
                 if ($num < 1 || $num > $maxPool) {
-                    $gateway->sendTextMessage($phone, "⚠️ All numbers must be between 1 and {$maxPool}. Invalid ball: {$num}", $tenant->whatsapp_number);
+                    $gateway->sendTextMessage($phone, $this->msg('invalid_ball_range', ['range' => $maxPool, 'ball' => $num], $lang), $tenant->whatsapp_number);
                     return;
                 }
             }
@@ -477,20 +570,22 @@ class LottoConversationEngine
         $numbersStr = implode(' - ', $selected);
         $minStake = $data['min_stake'] ?? 50;
 
-        $msg = "✅ Numbers Selected: *[ {$numbersStr} ]*\n\n"
-             . "Enter your stake amount in *{$tenant->currency}* (Min: {$tenant->currency} {$minStake}):\n"
-             . "e.g. *100*, *200*, *500*, *1000*\n\n"
-             . "_(Reply *0* to cancel)_";
+        $msg = $this->msg('enter_stake', [
+            'numbers' => $numbersStr,
+            'currency' => $tenant->currency,
+            'min' => $minStake,
+        ], $lang);
 
         $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
     }
 
     /**
-     * Handle stake entry and proceed to one-touch confirmation.
+     * Handle stake entry and proceed to one-touch confirmation (localized).
      */
     protected function handleStakeEntry(string $input, WhatsAppGatewayInterface $gateway, Tenant $tenant, Player $player, array $session, string $sessionKey): void
     {
         $phone = $player->phone;
+        $lang = $player->language ?? 'en';
         $data = $session['data'] ?? [];
 
         if ($input === '0') {
@@ -502,7 +597,7 @@ class LottoConversationEngine
         $minStake = (float) ($data['min_stake'] ?? 50);
 
         if ($stake < $minStake) {
-            $gateway->sendTextMessage($phone, "⚠️ Minimum stake is {$tenant->currency} {$minStake}. Please enter amount:", $tenant->whatsapp_number);
+            $gateway->sendTextMessage($phone, $this->msg('min_stake_error', ['currency' => $tenant->currency, 'min' => $minStake], $lang), $tenant->whatsapp_number);
             return;
         }
 
@@ -513,30 +608,31 @@ class LottoConversationEngine
         $numbersStr = implode(' - ', (array) $data['selected_numbers']);
         $gameTitle = $data['game_title'] ?? $data['game_code'];
 
-        $msg = "📋 *BET SLIP SUMMARY*\n"
-             . "━━━━━━━━━━━━━━━\n"
-             . "• Game: *{$gameTitle}*\n"
-             . "• Selection: *{$numbersStr}*\n"
-             . "• Stake: *{$tenant->currency} " . number_format($stake, 2) . "*\n"
-             . "━━━━━━━━━━━━━━━\n\n"
-             . "Reply *1* or *YES* to confirm and place this bet.\n"
-             . "_(Reply *0* to cancel)_";
+        $msg = $this->msg('confirm_ticket', [
+            'game' => $gameTitle,
+            'draw' => strtoupper(substr($data['game_code'] ?? '590', 0, 4)) . '-' . date('Hi'),
+            'numbers' => $numbersStr,
+            'currency' => $tenant->currency,
+            'stake' => number_format($stake, 2),
+            'wallet' => 'CASH',
+        ], $lang);
 
         $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
     }
 
     /**
-     * Handle one-touch bet confirmation without needing plaintext PIN.
+     * Handle one-touch bet confirmation without needing plaintext PIN (localized).
      */
     protected function handleBetConfirmation(string $input, WhatsAppGatewayInterface $gateway, Tenant $tenant, Player $player, array $session, string $sessionKey): void
     {
         $phone = $player->phone;
+        $lang = $player->language ?? 'en';
         $data = $session['data'] ?? [];
         $upper = strtoupper(trim($input));
 
-        if ($upper === '0' || str_contains($upper, 'NO') || str_contains($upper, 'CANCEL')) {
+        if ($upper === '0' || $upper === '2' || str_contains($upper, 'NO') || str_contains($upper, 'CANCEL')) {
             Cache::forget($sessionKey);
-            $gateway->sendTextMessage($phone, "❌ Bet placement cancelled.", $tenant->whatsapp_number);
+            $gateway->sendTextMessage($phone, $this->msg('bet_cancelled', [], $lang), $tenant->whatsapp_number);
             $this->showRootMenu($gateway, $tenant, $phone, $sessionKey, $player);
             return;
         }
@@ -555,7 +651,7 @@ class LottoConversationEngine
             return;
         }
 
-        $gateway->sendTextMessage($phone, "Reply *1* to confirm bet or *0* to cancel.", $tenant->whatsapp_number);
+        $gateway->sendTextMessage($phone, $this->msg('confirm_or_cancel_hint', [], $lang), $tenant->whatsapp_number);
     }
 
     /**
@@ -572,6 +668,7 @@ class LottoConversationEngine
         string $sessionKey
     ): void {
         $phone = $player->phone;
+        $lang = $player->language ?? 'en';
 
         // Resolve or create active game and open draw
         $lottoGame = LottoGame::firstOrCreate(
@@ -618,7 +715,15 @@ class LottoConversationEngine
                 walletSource: $walletSource
             );
         } catch (\Throwable $e) {
-            $gateway->sendTextMessage($phone, "❌ {$e->getMessage()}\n\nReply *2* to fund your wallet.", $tenant->whatsapp_number);
+            $errMsg = str_contains($e->getMessage(), 'Insufficient')
+                ? $this->msg('insufficient_cash', [
+                    'currency' => $tenant->currency,
+                    'cash' => number_format($player->cash_balance_kobo / 100, 2),
+                    'stake' => number_format($stakeKobo / 100, 2),
+                ], $lang)
+                : "❌ {$e->getMessage()}";
+
+            $gateway->sendTextMessage($phone, $errMsg, $tenant->whatsapp_number);
             Cache::forget($sessionKey);
             return;
         }
@@ -626,7 +731,6 @@ class LottoConversationEngine
         Cache::forget($sessionKey);
 
         $freshPlayer = $player->fresh();
-        $newCashNgn = number_format($freshPlayer->cash_balance_kobo / 100, 2);
         $stakeNgn = number_format($stakeKobo / 100, 2);
         $numbersStr = implode(' - ', $selectedNumbers);
 
@@ -640,24 +744,22 @@ class LottoConversationEngine
             $payoutNgn = number_format($outcome['payout_kobo'] / 100, 2);
 
             if ($outcome['status'] === 'WON') {
-                $receipt = "🎉 *KENO INSTANT WIN!* 🏆\n"
-                         . "━━━━━━━━━━━━━━━━━━━━\n"
-                         . "• Ticket: *{$ticket->ticket_reference}*\n"
-                         . "• Hits: *{$hitCount} / " . count($selectedNumbers) . "*\n"
-                         . "• Payout Won: *{$tenant->currency} {$payoutNgn}*\n"
-                         . "• Drawn Numbers:\n{$drawnStr}\n"
-                         . "━━━━━━━━━━━━━━━━━━━━\n"
-                         . "💵 New Balance: *{$tenant->currency} " . number_format($freshPlayer->fresh()->cash_balance_kobo / 100, 2) . "*\n\n"
-                         . "Reply *1* to play again!";
+                $receipt = $this->msg('keno_win', [
+                    'ticket' => $ticket->ticket_reference,
+                    'hits' => $hitCount,
+                    'picks' => count($selectedNumbers),
+                    'currency' => $tenant->currency,
+                    'payout' => $payoutNgn,
+                    'drawn' => $drawnStr,
+                    'balance' => number_format($freshPlayer->fresh()->cash_balance_kobo / 100, 2),
+                ], $lang);
             } else {
-                $receipt = "🎟️ *KENO INSTANT DRAW RESULT*\n"
-                         . "━━━━━━━━━━━━━━━━━━━━\n"
-                         . "• Ticket: *{$ticket->ticket_reference}*\n"
-                         . "• Hits: *{$hitCount} / " . count($selectedNumbers) . "*\n"
-                         . "• Drawn Numbers:\n{$drawnStr}\n"
-                         . "━━━━━━━━━━━━━━━━━━━━\n"
-                         . "Better luck next time! 🍀\n\n"
-                         . "Reply *1* to play again or *BAL* for balance.";
+                $receipt = $this->msg('keno_loss', [
+                    'ticket' => $ticket->ticket_reference,
+                    'hits' => $hitCount,
+                    'picks' => count($selectedNumbers),
+                    'drawn' => $drawnStr,
+                ], $lang);
             }
 
             $gateway->sendTextMessage($phone, $receipt, $tenant->whatsapp_number);
@@ -665,7 +767,6 @@ class LottoConversationEngine
         }
 
         // Scheduled 5/90 Draw receipt
-        $lang = $player->language ?? 'en';
         $payoutPotentialNgn = number_format(($stakeKobo * 240) / 100, 2);
         $sealPreview = substr($ticket->hash ?? ('HMAC-' . strtoupper(bin2hex(random_bytes(6)))), 0, 16) . '...';
 
@@ -846,10 +947,12 @@ class LottoConversationEngine
     }
 
     /**
-     * Show latest draw results.
+     * Show latest draw results in the player's chosen language.
      */
-    protected function showLatestResults(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone): void
+    protected function showLatestResults(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, ?Player $player = null, ?string $specificGame = null): void
     {
+        $lang = $player?->language ?? 'en';
+
         $latestDraw = GameDraw::where('tenant_id', $tenant->id)
             ->whereNotNull('winning_numbers')
             ->orderByDesc('settled_at')
@@ -859,14 +962,14 @@ class LottoConversationEngine
             ? implode(' - ', $latestDraw->winning_numbers)
             : '7 - 14 - 21 - 35 - 42';
 
-        $drawCode = $latestDraw?->draw_code ?? 'M590-DAILY';
+        $drawCode = $specificGame
+            ? trim(str_ireplace(['You Selected', 'Results', 'Result'], '', $specificGame)) . ' (' . now()->format('d M') . ')'
+            : ($latestDraw?->draw_code ?? 'M590-DAILY');
 
-        $msg = "🏆 *LATEST DRAW RESULTS*\n"
-             . "━━━━━━━━━━━━━━━━━━━━\n"
-             . "• Draw: *{$drawCode}*\n"
-             . "• Winning Numbers: *[ {$winningNums} ]*\n"
-             . "━━━━━━━━━━━━━━━━━━━━\n\n"
-             . "Reply *1* to play games or *BAL* for balance.";
+        $msg = $this->msg('latest_results_box', [
+            'draw' => $drawCode,
+            'numbers' => $winningNums,
+        ], $lang);
 
         $gateway->sendTextMessage($phone, $msg, $tenant->whatsapp_number);
     }
@@ -884,6 +987,25 @@ class LottoConversationEngine
         string $sessionKey
     ): void {
         $currentItemId = $session['item_id'] ?? null;
+
+        // Handle '0' (Back) inside the USSD menu tree
+        if ($input === '0' && $currentItemId) {
+            $currentItem = UssdMenuItem::find($currentItemId);
+            if ($currentItem && $currentItem->parent_item_id) {
+                $parentItem = UssdMenuItem::find($currentItem->parent_item_id);
+                if ($parentItem) {
+                    Cache::put($sessionKey, [
+                        'state' => 'USSD_MENU',
+                        'item_id' => $parentItem->id,
+                        'data' => [],
+                    ], now()->addMinutes(15));
+                    $gateway->sendTextMessage($player->phone, $parentItem->response_text, $tenant->whatsapp_number);
+                    return;
+                }
+            }
+            $this->showRootMenu($gateway, $tenant, $player->phone, $sessionKey, $player);
+            return;
+        }
 
         // If in tree, check database for child matching trigger
         if ($currentItemId) {
@@ -903,91 +1025,78 @@ class LottoConversationEngine
                     return;
                 }
 
-                // If API action
+                // If API leaf node action: inspect the action type!
                 $text = strtoupper($child->response_text);
-                if (str_contains($text, 'SELECT BALLS') || $child->id == 115 || str_contains($text, 'KENO')) {
-                    Cache::put($sessionKey, [
-                        'state' => 'SELECT_NUMBERS',
-                        'data' => [
-                            'game_code' => 'KENO_20_80',
-                            'game_title' => 'Keno 20/80',
-                            'pool' => 80,
-                            'picks' => 10,
-                            'min_stake' => 50,
-                        ],
-                    ], now()->addMinutes(15));
 
-                    $msg = "🎱 *Keno 20/80 - Select Numbers*\n\n"
-                         . "Pick *10 numbers* between 1 and 80 (e.g. _5 12 28 34 45 52 61 70 75 80_)\n"
-                         . "Or reply *QP* for Quick Pick.\n\n"
-                         . "Reply *0* to go back.";
-
-                    $gateway->sendTextMessage($player->phone, $msg, $tenant->whatsapp_number);
+                // 1. Check Results leaf nodes (e.g., "You Selected Blessing Results", IDs 264, 266..286)
+                if (str_contains($text, 'RESULT') || ($child->id >= 264 && $child->id <= 286)) {
+                    $this->showLatestResults($gateway, $tenant, $player->phone, $player, $child->response_text);
+                    $this->showRootMenu($gateway, $tenant, $player->phone, $sessionKey, $player);
                     return;
                 }
 
-                // 5/90 Direct / Perms
-                Cache::put($sessionKey, [
-                    'state' => 'SELECT_NUMBERS',
-                    'data' => [
-                        'game_code' => '5_90_DAILY',
-                        'game_title' => $child->response_text,
-                        'pool' => 90,
-                        'picks' => 5,
-                        'min_stake' => 100,
-                    ],
-                ], now()->addMinutes(15));
+                // 2. Recharge leaf nodes (IDs 288, 289)
+                if (str_contains($text, 'RECHARGE') || in_array($child->id, [288, 289])) {
+                    $this->showDepositOptions($gateway, $tenant, $player->phone, $player);
+                    $this->showRootMenu($gateway, $tenant, $player->phone, $sessionKey, $player);
+                    return;
+                }
 
-                $msg = "🎯 *{$child->response_text}*\n\n"
-                     . "Pick *5 numbers* between 1 and 90 (e.g. _7 14 21 35 42_)\n"
-                     . "Or reply *QP* for Quick Pick.\n\n"
-                     . "Reply *0* to go back.";
+                // 3. Withdraw leaf nodes (IDs 291, 292)
+                if (str_contains($text, 'WITHDRAW') || str_contains($text, 'BANK CARD') || in_array($child->id, [291, 292])) {
+                    $cashNgn = number_format($player->cash_balance_kobo / 100, 2);
+                    Cache::put($sessionKey, ['state' => 'WITHDRAWAL_AMOUNT', 'data' => []], now()->addMinutes(15));
+                    $gateway->sendTextMessage(
+                        $player->phone,
+                        "🏦 *BANK CASH WITHDRAWAL*\n━━━━━━━━━━━━━━━━━━━━\nAvailable Cash Balance: *{$tenant->currency} {$cashNgn}*\n\nEnter the amount you wish to withdraw in *{$tenant->currency}* (Min: {$tenant->currency} 500):\n_(Reply *0* to cancel)_",
+                        $tenant->whatsapp_number
+                    );
+                    return;
+                }
 
-                $gateway->sendTextMessage($player->phone, $msg, $tenant->whatsapp_number);
+                // 4. Balance / Bonus Check leaf nodes (IDs 294, 295, 296)
+                if (str_contains($text, 'BALANCE') || str_contains($text, 'BONUS') || in_array($child->id, [294, 295, 296])) {
+                    $this->handleShortcuts('BAL', $gateway, $tenant, $player, $sessionKey);
+                    return;
+                }
+
+                // 5. Keno leaf node
+                if (str_contains($text, 'SELECT BALLS') || $child->id == 115 || str_contains($text, 'KENO')) {
+                    $this->startGameSelection('KENO', $gateway, $tenant, $player, $sessionKey, 'Keno 20/80', 10);
+                    return;
+                }
+
+                // 6. Determine required number of balls for 5/90 Perm/Banker games
+                $picks = 5;
+                if (str_contains($text, 'PERM1') || str_contains($text, '1BANKER') || str_contains($text, '1ST DRAWN')) {
+                    $picks = 1;
+                } elseif (str_contains($text, 'PERM2') || str_contains($text, '2 SURE') || str_contains($text, 'NAP 2')) {
+                    $picks = 2;
+                } elseif (str_contains($text, 'PERM3') || str_contains($text, 'NAP 3')) {
+                    $picks = 3;
+                } elseif (str_contains($text, 'PERM4') || str_contains($text, 'NAP 4')) {
+                    $picks = 4;
+                }
+
+                $cleanTitle = trim(preg_replace('/^You Selected\s+/i', '', $child->response_text));
+                $this->startGameSelection('5_90_DAILY', $gateway, $tenant, $player, $sessionKey, $cleanTitle, $picks);
                 return;
             }
         }
 
         $upper = strtoupper(trim($input));
 
-        if (str_contains($upper, 'KENO') || $upper === '2') {
-            Cache::put($sessionKey, [
-                'state' => 'SELECT_NUMBERS',
-                'data' => [
-                    'game_code' => 'KENO_20_80',
-                    'game_title' => 'Keno 20/80',
-                    'pool' => 80,
-                    'picks' => 10,
-                    'min_stake' => 50,
-                ],
-            ], now()->addMinutes(15));
-
-            $msg = "🎱 *Keno 20/80 - Select Numbers*\n\n"
-                 . "Pick *10 numbers* between 1 and 80 (e.g. _5 12 28 34 45 52 61 70 75 80_)\n"
-                 . "Or reply *QP* for Quick Pick.\n\n"
-                 . "Reply *0* to go back.";
-
-            $gateway->sendTextMessage($player->phone, $msg, $tenant->whatsapp_number);
+        if (str_contains($upper, 'KENO') || $upper === '2' || $upper === 'GAME_KENO') {
+            $this->startGameSelection('KENO', $gateway, $tenant, $player, $sessionKey);
             return;
         }
 
-        // Default: Modern 5/90 Direct
-        Cache::put($sessionKey, [
-            'state' => 'SELECT_NUMBERS',
-            'data' => [
-                'game_code' => '5_90_DAILY',
-                'game_title' => 'Modern 5/90 Direct',
-                'pool' => 90,
-                'picks' => 5,
-                'min_stake' => 100,
-            ],
-        ], now()->addMinutes(15));
+        if (str_contains($upper, 'FAST3') || $upper === '3' || $upper === 'GAME_FAST3') {
+            $this->startGameSelection('FAST3', $gateway, $tenant, $player, $sessionKey);
+            return;
+        }
 
-        $msg = "🎯 *Modern 5/90 - Select Numbers*\n\n"
-             . "Pick *5 numbers* between 1 and 90 (e.g. _7 14 21 35 42_)\n"
-             . "Or reply *QP* for Quick Pick.\n\n"
-             . "Reply *0* to go back.";
-
-        $gateway->sendTextMessage($player->phone, $msg, $tenant->whatsapp_number);
+        // Default: Modern 5/90 Direct in player's language
+        $this->startGameSelection('5_90_DAILY', $gateway, $tenant, $player, $sessionKey);
     }
 }

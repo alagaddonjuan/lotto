@@ -17,13 +17,15 @@ class ModernLotteryUssdMenuSeeder extends Seeder
             return;
         }
 
-        $menu = UssdMenu::updateOrCreate(
+        DB::table('ussd_menus')->updateOrInsert(
             ['id' => 9],
             [
                 'tenant_id' => $tenant->id,
                 'menu_name' => 'ML Updated menu',
                 'service_code' => '*347*102#',
                 'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]
         );
 
@@ -215,18 +217,23 @@ class ModernLotteryUssdMenuSeeder extends Seeder
             [297, 9, 112, "6", "CON", "You Selected Contact Us\n\n1. Website\n2. WhatsApp Support\n3. Phone Helpline\n0. Back"],
         ];
 
-        foreach ($items as $item) {
-            UssdMenuItem::updateOrCreate(
-                ['id' => $item[0]],
-                [
-                    'ussd_menu_id' => $item[1],
-                    'parent_item_id' => $item[2],
-                    'option_trigger' => (string)$item[3],
-                    'response_type' => (string)$item[4],
-                    'response_text' => (string)$item[5],
-                ]
-            );
-        }
+        $now = now();
+        $rows = array_map(fn ($item) => [
+            'id' => $item[0],
+            'ussd_menu_id' => $item[1],
+            'parent_item_id' => $item[2],
+            'option_trigger' => (string) $item[3],
+            'response_type' => (string) $item[4],
+            'response_text' => (string) $item[5],
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $items);
+
+        DB::table('ussd_menu_items')->upsert(
+            $rows,
+            ['id'],
+            ['ussd_menu_id', 'parent_item_id', 'option_trigger', 'response_type', 'response_text', 'updated_at']
+        );
     }
 }
 

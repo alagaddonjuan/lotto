@@ -182,6 +182,29 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
             return true;
         }
 
+        // Enforce Meta WhatsApp Cloud API strict character limits:
+        // section.title <= 24 chars, row.title <= 24 chars, row.description <= 72 chars, action.button <= 20 chars
+        $sanitizedSections = [];
+        foreach (array_slice($sections, 0, 10) as $sec) {
+            $rows = [];
+            foreach (array_slice($sec['rows'] ?? [], 0, 10) as $row) {
+                $sanitizedRow = [
+                    'id' => mb_substr((string) ($row['id'] ?? uniqid('row_')), 0, 200),
+                    'title' => mb_substr(trim((string) ($row['title'] ?? 'Option')), 0, 24),
+                ];
+                if (!empty($row['description'])) {
+                    $sanitizedRow['description'] = mb_substr(trim((string) $row['description']), 0, 72);
+                }
+                $rows[] = $sanitizedRow;
+            }
+
+            $sanitizedSec = ['rows' => $rows];
+            if (!empty($sec['title'])) {
+                $sanitizedSec['title'] = mb_substr(trim((string) $sec['title']), 0, 24);
+            }
+            $sanitizedSections[] = $sanitizedSec;
+        }
+
         $response = Http::withToken($this->accessToken)
             ->post("https://graph.facebook.com/{$this->apiVersion}/{$phoneId}/messages", [
                 'messaging_product' => 'whatsapp',
@@ -190,10 +213,10 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
                 'type' => 'interactive',
                 'interactive' => [
                     'type' => 'list',
-                    'body' => ['text' => $header],
+                    'body' => ['text' => mb_substr($header, 0, 1024)],
                     'action' => [
-                        'button' => mb_substr($buttonTitle, 0, 20),
-                        'sections' => $sections,
+                        'button' => mb_substr(trim($buttonTitle), 0, 20),
+                        'sections' => $sanitizedSections,
                     ],
                 ],
             ]);

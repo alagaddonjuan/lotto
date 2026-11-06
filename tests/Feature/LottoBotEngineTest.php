@@ -22,15 +22,13 @@ class LottoBotEngineTest extends TestCase
     {
         parent::setUp();
 
+        // Bypass signatures in testing for direct Meta Cloud API
+        config(['services.meta.bypass_signature' => true]);
         \Illuminate\Support\Facades\Cache::flush();
 
         $this->seed(ModernLotterySeeder::class);
         $this->seed(ModernLotteryUssdMenuSeeder::class);
         $this->tenant = Tenant::where('slug', 'modern-lottery')->first();
-
-        // Bypass signatures in testing for direct Meta Cloud API
-        config(['services.meta.bypass_signature' => true]);
-        config(['cache.default' => 'file']);
     }
 
     /**
@@ -243,5 +241,75 @@ class LottoBotEngineTest extends TestCase
 
         $player->refresh();
         $this->assertEquals(300000, $player->cash_balance_kobo, '₦2,000 (200,000 Kobo) deducted after PIN verification');
+    }
+
+    public function test_end_to_end_yoruba_localization_and_meta_character_limits(): void
+    {
+        // Verify Meta Cloud API character limits across all 5 supported languages
+        foreach (['en', 'pcm', 'yo', 'ha', 'ig'] as $locale) {
+            $sectionTitle = trans('bot.games_section_title', [], $locale);
+            $menuBtn = trans('bot.games_menu_btn', [], $locale);
+            $btnPlay = '🎯 ' . trans('bot.btn_play', [], $locale);
+            $btnFund = '💳 ' . trans('bot.btn_fund', [], $locale);
+            $btnResults = '🏆 ' . trans('bot.btn_results', [], $locale);
+
+            $this->assertLessThanOrEqual(24, mb_strlen($sectionTitle), "games_section_title in [{$locale}] exceeds 24 chars");
+            $this->assertLessThanOrEqual(20, mb_strlen($menuBtn), "games_menu_btn in [{$locale}] exceeds 20 chars");
+            $this->assertLessThanOrEqual(20, mb_strlen($btnPlay), "btn_play in [{$locale}] exceeds 20 chars");
+            $this->assertLessThanOrEqual(20, mb_strlen($btnFund), "btn_fund in [{$locale}] exceeds 20 chars");
+            $this->assertLessThanOrEqual(20, mb_strlen($btnResults), "btn_results in [{$locale}] exceeds 20 chars");
+        }
+
+        // End-to-end flow in Yoruba
+        $playerPhone = '2347034616262';
+        Player::create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => $playerPhone,
+            'name' => 'Michael',
+            'language' => 'yo',
+            'cash_balance_kobo' => 0,
+        ]);
+
+        // Tap Play Game button
+        $this->sendMetaMessage($playerPhone, 'Play Game', 'opt_play')->assertStatus(200);
+
+        // Select Modern 5/90 Direct from list
+        $this->sendMetaMessage($playerPhone, 'Modern 5/90 Direct', 'game_590')->assertStatus(200);
+        $session = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
+        $this->assertEquals('SELECT_NUMBERS', $session['state']);
+
+        // Pick 5 numbers -> moves to ENTER_STAKE
+        $this->sendMetaMessage($playerPhone, '66 16 65 36 88')->assertStatus(200);
+        $session = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
+        $this->assertEquals('ENTER_STAKE', $session['state']);
+
+        // Enter stake 200 -> moves to CONFIRM_BET
+        $this->sendMetaMessage($playerPhone, '200')->assertStatus(200);
+        $session = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
+        $this->assertEquals('CONFIRM_BET', $session['state']);
+    }
+
+    public function test_ussd_check_results_leaf_node_displays_results_instead_of_number_picker(): void
+    {
+        $playerPhone = '2348055443322';
+        Player::create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => $playerPhone,
+            'name' => 'Test Player',
+            'language' => 'en',
+        ]);
+
+        // Navigate USSD: 2 (Check Result) -> 2 (Modern BILLIONAIRE) -> 6 (Blessing Results)
+        $this->sendMetaMessage($playerPhone, '2')->assertStatus(200);
+        $s1 = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
+
+        $this->sendMetaMessage($playerPhone, '2')->assertStatus(200);
+        $s2 = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
+
+        $this->sendMetaMessage($playerPhone, '6')->assertStatus(200);
+        $s3 = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
+
+        $count = \App\Models\UssdMenuItem::count();
+        $this->assertEquals('ROOT_MENU', $s3['state'] ?? null, "Count: {$count} | S1: " . json_encode($s1) . " | S2: " . json_encode($s2) . " | S3: " . json_encode($s3));
     }
 }
