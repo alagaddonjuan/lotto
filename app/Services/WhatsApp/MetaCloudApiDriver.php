@@ -11,15 +11,64 @@ use Illuminate\Support\Facades\Log;
 class MetaCloudApiDriver implements WhatsAppGatewayInterface
 {
     protected ?string $accessToken = null;
+    protected ?string $fallbackAccessToken = null;
     protected ?string $phoneNumberId = null;
     protected ?string $appSecret = null;
     protected string $apiVersion = 'v20.0';
 
     public function __construct(array $config = [])
     {
-        $this->accessToken = $config['access_token'] ?? config('services.meta.access_token') ?? '';
-        $this->phoneNumberId = $config['phone_number_id'] ?? config('services.meta.phone_number_id') ?? '';
-        $this->appSecret = $config['app_secret'] ?? config('services.meta.app_secret') ?? '';
+        $envToken = $this->cleanToken((string) (config('services.meta.access_token') ?? ''));
+        $dbToken = $this->cleanToken((string) ($config['access_token'] ?? ''));
+
+        $this->accessToken = !empty($dbToken) ? $dbToken : $envToken;
+        $this->fallbackAccessToken = (!empty($envToken) && $envToken !== $this->accessToken) ? $envToken : null;
+
+        $dbPhoneId = trim((string) ($config['phone_number_id'] ?? ''));
+        $envPhoneId = trim((string) (config('services.meta.phone_number_id') ?? ''));
+        $this->phoneNumberId = !empty($dbPhoneId) ? $dbPhoneId : $envPhoneId;
+
+        $dbSecret = trim((string) ($config['app_secret'] ?? ''));
+        $envSecret = trim((string) (config('services.meta.app_secret') ?? ''));
+        $this->appSecret = !empty($dbSecret) ? $dbSecret : $envSecret;
+    }
+
+    /**
+     * Sanitize token by removing accidental 'Bearer ' prefixes, surrounding quotes, or whitespace/newlines.
+     */
+    protected function cleanToken(string $token): string
+    {
+        $cleaned = trim($token, " \t\n\r\0\x0B\"'");
+        if (stripos($cleaned, 'Bearer ') === 0) {
+            $cleaned = trim(substr($cleaned, 7), " \t\n\r\0\x0B\"'");
+        }
+        return $cleaned;
+    }
+
+    /**
+     * Send a message payload to Meta Graph API with automatic fallback to .env token on 401 OAuthException (code 190).
+     */
+    protected function sendGraphPayload(string $phoneId, array $payload, string $recipient, string $actionLabel): bool
+    {
+        $url = "https://graph.facebook.com/{$this->apiVersion}/{$phoneId}/messages";
+        $response = Http::withToken($this->accessToken)->post($url, $payload);
+
+        if ($response->status() === 401 && !empty($this->fallbackAccessToken)) {
+            Log::warning("[MetaCloudDriver] Primary token returned 401 on {$actionLabel}; retrying with fallback .env META_ACCESS_TOKEN.");
+            $response = Http::withToken($this->fallbackAccessToken)->post($url, $payload);
+        }
+
+        if ($response->failed()) {
+            Log::error("[MetaCloudDriver] {$actionLabel} failed", [
+                'to' => $recipient,
+                'phone_id' => $phoneId,
+                'status' => $response->status(),
+                'response' => $response->json(),
+            ]);
+            return false;
+        }
+
+        return true;
     }
 
     public function parseIncomingRequest(Request $request): IncomingMessageDTO
@@ -104,26 +153,13 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
             return true;
         }
 
-        $response = Http::withToken($this->accessToken)
-            ->post("https://graph.facebook.com/{$this->apiVersion}/{$phoneId}/messages", [
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $recipient,
-                'type' => 'text',
-                'text' => ['preview_url' => false, 'body' => $text],
-            ]);
-
-        if ($response->failed()) {
-            Log::error('[MetaCloudDriver] Send text failed', [
-                'to' => $recipient,
-                'phone_id' => $phoneId,
-                'status' => $response->status(),
-                'response' => $response->json(),
-            ]);
-            return false;
-        }
-
-        return true;
+        return $this->sendGraphPayload($phoneId, [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $recipient,
+            'type' => 'text',
+            'text' => ['preview_url' => false, 'body' => $text],
+        ], $recipient, 'Send text');
     }
 
     public function sendQuickReplyButtons(string $to, string $text, array $buttons, ?string $from = null): bool
@@ -146,30 +182,17 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
             ];
         }
 
-        $response = Http::withToken($this->accessToken)
-            ->post("https://graph.facebook.com/{$this->apiVersion}/{$phoneId}/messages", [
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $recipient,
-                'type' => 'interactive',
-                'interactive' => [
-                    'type' => 'button',
-                    'body' => ['text' => $text],
-                    'action' => ['buttons' => $formattedButtons],
-                ],
-            ]);
-
-        if ($response->failed()) {
-            Log::error('[MetaCloudDriver] Send quick reply buttons failed', [
-                'to' => $recipient,
-                'phone_id' => $phoneId,
-                'status' => $response->status(),
-                'response' => $response->json(),
-            ]);
-            return false;
-        }
-
-        return true;
+        return $this->sendGraphPayload($phoneId, [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $recipient,
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => ['text' => $text],
+                'action' => ['buttons' => $formattedButtons],
+            ],
+        ], $recipient, 'Send quick reply buttons');
     }
 
     public function sendListMenu(string $to, string $header, string $buttonTitle, array $sections, ?string $from = null): bool
@@ -205,32 +228,19 @@ class MetaCloudApiDriver implements WhatsAppGatewayInterface
             $sanitizedSections[] = $sanitizedSec;
         }
 
-        $response = Http::withToken($this->accessToken)
-            ->post("https://graph.facebook.com/{$this->apiVersion}/{$phoneId}/messages", [
-                'messaging_product' => 'whatsapp',
-                'recipient_type' => 'individual',
-                'to' => $recipient,
-                'type' => 'interactive',
-                'interactive' => [
-                    'type' => 'list',
-                    'body' => ['text' => mb_substr($header, 0, 1024)],
-                    'action' => [
-                        'button' => mb_substr(trim($buttonTitle), 0, 20),
-                        'sections' => $sanitizedSections,
-                    ],
+        return $this->sendGraphPayload($phoneId, [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $recipient,
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'list',
+                'body' => ['text' => mb_substr($header, 0, 1024)],
+                'action' => [
+                    'button' => mb_substr(trim($buttonTitle), 0, 20),
+                    'sections' => $sanitizedSections,
                 ],
-            ]);
-
-        if ($response->failed()) {
-            Log::error('[MetaCloudDriver] Send list menu failed', [
-                'to' => $recipient,
-                'phone_id' => $phoneId,
-                'status' => $response->status(),
-                'response' => $response->json(),
-            ]);
-            return false;
-        }
-
-        return true;
+            ],
+        ], $recipient, 'Send list menu');
     }
 }
