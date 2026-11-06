@@ -287,6 +287,17 @@ class LottoBotEngineTest extends TestCase
         $this->sendMetaMessage($playerPhone, '200')->assertStatus(200);
         $session = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
         $this->assertEquals('CONFIRM_BET', $session['state']);
+
+        // Confirm bet with 0 balance -> prompts "Kọ 2 tàbí FUND láti fi owó síi lẹ́sẹ̀kẹsẹ̀."
+        $this->sendMetaMessage($playerPhone, '1')->assertStatus(200);
+        $insufficientReply = \Illuminate\Support\Facades\Cache::get("sim_reply:{$playerPhone}");
+        $this->assertStringContainsString('Owó Kò Tó', (string) $insufficientReply);
+
+        // Reply '2' to fund -> shows Yoruba Virtual Bank Account details, NOT Check Result or games list
+        $this->sendMetaMessage($playerPhone, '2')->assertStatus(200);
+        $fundReply = \Illuminate\Support\Facades\Cache::get("sim_reply:{$playerPhone}");
+        $this->assertStringContainsString('Wema Bank / Monnify', (string) $fundReply);
+        $this->assertStringContainsString('9034616262', (string) $fundReply);
     }
 
     public function test_ussd_check_results_leaf_node_displays_results_instead_of_number_picker(): void
@@ -299,17 +310,11 @@ class LottoBotEngineTest extends TestCase
             'language' => 'en',
         ]);
 
-        // Navigate USSD: 2 (Check Result) -> 2 (Modern BILLIONAIRE) -> 6 (Blessing Results)
-        $this->sendMetaMessage($playerPhone, '2')->assertStatus(200);
-        $s1 = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
-
-        $this->sendMetaMessage($playerPhone, '2')->assertStatus(200);
-        $s2 = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
-
+        // Navigate USSD via chained dial: 2*2 (Check Result -> Modern BILLIONAIRE) -> 6 (Blessing Results)
+        $this->sendMetaMessage($playerPhone, '2*2')->assertStatus(200);
         $this->sendMetaMessage($playerPhone, '6')->assertStatus(200);
         $s3 = \Illuminate\Support\Facades\Cache::get("wa:session:{$playerPhone}");
 
-        $count = \App\Models\UssdMenuItem::count();
-        $this->assertEquals('ROOT_MENU', $s3['state'] ?? null, "Count: {$count} | S1: " . json_encode($s1) . " | S2: " . json_encode($s2) . " | S3: " . json_encode($s3));
+        $this->assertEquals('ROOT_MENU', $s3['state'] ?? null);
     }
 }

@@ -160,22 +160,32 @@ class LottoConversationEngine
 
         // Top-Level Navigation Triggers (when at Root menu)
         if (($session['state'] ?? 'ROOT_MENU') === 'ROOT_MENU') {
-            if (str_contains($upperInput, 'PLAY')) {
+            if ($upperInput === '1' || str_contains($upperInput, 'PLAY')) {
                 $this->showGamesMenu($gateway, $tenant, $phone, $sessionKey, $player);
                 return;
             }
 
-            if (str_contains($upperInput, 'FUND') || str_contains($upperInput, 'DEPOSIT')) {
+            if ($upperInput === '2' || str_contains($upperInput, 'FUND') || str_contains($upperInput, 'DEPOSIT')) {
                 $this->showDepositOptions($gateway, $tenant, $phone, $player);
                 return;
             }
 
-            if (str_contains($upperInput, 'RESULT')) {
+            if ($upperInput === '3' || str_contains($upperInput, 'RESULT')) {
                 $this->showLatestResults($gateway, $tenant, $phone, $player);
                 return;
             }
 
-            // Direct numeric or chained USSD trigger (e.g. 1, 2, 2*2, 5*1 in USSD mode)
+            if ($upperInput === '4') {
+                $this->handleShortcuts('WITHDRAW', $gateway, $tenant, $player, $sessionKey);
+                return;
+            }
+
+            if ($upperInput === '5') {
+                $this->handleShortcuts('BAL', $gateway, $tenant, $player, $sessionKey);
+                return;
+            }
+
+            // Chained USSD trigger (e.g. 2*2, 5*1) or option 6 (Contact Us)
             if (ctype_digit($input) || preg_match('/^\d+(\*\d+)+$/', $input)) {
                 if (empty($session['item_id'])) {
                     $menu = UssdMenu::where('tenant_id', $tenant->id)->where('is_active', true)->first();
@@ -192,6 +202,10 @@ class LottoConversationEngine
 
         // Dispatch based on active session state
         switch ($session['state'] ?? 'ROOT_MENU') {
+            case 'SELECT_GAME':
+                $this->handleGameSelection($input, $gateway, $tenant, $player, $sessionKey);
+                break;
+
             case 'SELECT_NUMBERS':
                 $this->handleNumberSelection($input, $gateway, $tenant, $player, $session, $sessionKey);
                 break;
@@ -349,10 +363,45 @@ class LottoConversationEngine
         $gateway->sendListMenu($phone, $header, $btnTitle, $sections, $tenant->whatsapp_number);
 
         Cache::put($sessionKey, [
-            'state' => 'USSD_MENU',
+            'state' => 'SELECT_GAME',
             'item_id' => null,
             'data' => [],
         ], now()->addMinutes(15));
+    }
+
+    /**
+     * Handle game selection when the user is in SELECT_GAME state (after showGamesMenu).
+     */
+    protected function handleGameSelection(
+        string $input,
+        WhatsAppGatewayInterface $gateway,
+        Tenant $tenant,
+        Player $player,
+        string $sessionKey
+    ): void {
+        $upper = strtoupper(trim($input));
+
+        if ($upper === '0') {
+            $this->showRootMenu($gateway, $tenant, $player->phone, $sessionKey, $player);
+            return;
+        }
+
+        if ($upper === '1' || $upper === 'GAME_590' || str_contains($upper, '5/90') || str_contains($upper, '590')) {
+            $this->startGameSelection('5_90_DAILY', $gateway, $tenant, $player, $sessionKey);
+            return;
+        }
+
+        if ($upper === '2' || $upper === 'GAME_KENO' || str_contains($upper, 'KENO')) {
+            $this->startGameSelection('KENO', $gateway, $tenant, $player, $sessionKey);
+            return;
+        }
+
+        if ($upper === '3' || $upper === 'GAME_FAST3' || str_contains($upper, 'FAST')) {
+            $this->startGameSelection('FAST3', $gateway, $tenant, $player, $sessionKey);
+            return;
+        }
+
+        $this->showRootMenu($gateway, $tenant, $player->phone, $sessionKey, $player);
     }
 
     /**
@@ -435,6 +484,8 @@ class LottoConversationEngine
             $cashNgn = number_format($player->cash_balance_kobo / 100, 2);
             $bonusNgn = number_format($player->bonus_balance_kobo / 100, 2);
             $totalNgn = number_format($player->totalBalanceKobo() / 100, 2);
+
+            Cache::put($sessionKey, ['state' => 'ROOT_MENU', 'item_id' => null, 'data' => []], now()->addMinutes(15));
 
             $msg = $this->msg('wallet_balance_box', [
                 'currency' => $tenant->currency,
@@ -937,6 +988,8 @@ class LottoConversationEngine
         $accountNo = '9' . substr(preg_replace('/[^0-9]/', '', $phone), -9);
         $name = $player?->name ?? 'Player';
 
+        Cache::put("wa:session:{$phone}", ['state' => 'ROOT_MENU', 'item_id' => null, 'data' => []], now()->addMinutes(15));
+
         $msg = $this->msg('fund_info', [
             'account' => $accountNo,
             'tenant' => $tenant->name,
@@ -952,6 +1005,8 @@ class LottoConversationEngine
     protected function showLatestResults(WhatsAppGatewayInterface $gateway, Tenant $tenant, string $phone, ?Player $player = null, ?string $specificGame = null): void
     {
         $lang = $player?->language ?? 'en';
+
+        Cache::put("wa:session:{$phone}", ['state' => 'ROOT_MENU', 'item_id' => null, 'data' => []], now()->addMinutes(15));
 
         $latestDraw = GameDraw::where('tenant_id', $tenant->id)
             ->whereNotNull('winning_numbers')
